@@ -1,38 +1,124 @@
-import os
-from sqlalchemy import create_engine
+import logging
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
-from sqlalchemy import text
+from sqlalchemy.pool import QueuePool
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from app.config import settings
 
-# Load environment variables
-load_dotenv()
+logger = logging.getLogger(__name__)
 
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_PORT = os.getenv("DB_PORT")
+class DatabaseManager:
+    def __init__(self):
+        self.engine = None
+        self.SessionLocal = None
+        self._initialize_database()
+    
+    def _initialize_database(self):
+        """Initialize database connection with proper error handling"""
+        try:
+            # Calculate pool size
+            pool_size = max(settings.DB_POOL_SIZE // settings.WEB_CONCURRENCY, 5)
+            
+            # Create database if it doesn't exist
+            self._create_database_if_not_exists()
+            
+            # Create main engine
+            database_url = (
+                f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
+                f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+            )
+            
+            self.engine = create_engine(
+                database_url,
+                poolclass=QueuePool,
+                pool_size=pool_size,
+                max_overflow=0,
+                pool_pre_ping=True,  # Verify connections before use
+                pool_recycle=3600,   # Recycle connections every hour
+                echo=settings.DEBUG,  # Log SQL queries in debug mode
+            )
+            
+            # Add connection event listeners
+            self._setup_connection_events()
+            
+            # Create session factory
+            self.SessionLocal = sessionmaker(
+                autocommit=False, 
+                autoflush=False, 
+                bind=self.engine
+            )
+            
+            # Test connection
+            self._test_connection()
+            
+            logger.info("Database initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            raise RuntimeError(f"Database initialization failed: {e}")
+    
+    def _create_database_if_not_exists(self):
+        """Create database if it doesn't exist"""
+        try:
+            temp_url = (
+                f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
+                f"@{settings.DB_HOST}:{settings.DB_PORT}/"
+            )
+            temp_engine = create_engine(temp_url)
+            
+            with temp_engine.connect() as connection:
+                connection.execute(text(f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}`"))
+                connection.commit()
+            
+            temp_engine.dispose()
+            logger.info(f"Database '{settings.DB_NAME}' ensured to exist")
+            
+        except Exception as e:
+            logger.error(f"Failed to create database: {e}")
+            raise
+    
+    def _setup_connection_events(self):
+        """Setup connection event listeners for monitoring"""
+        @event.listens_for(self.engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            # This is for MySQL, but we can add connection-specific settings here
+            pass
+        
+        @event.listens_for(self.engine, "checkout")
+        def receive_checkout(dbapi_connection, connection_record, connection_proxy):
+            logger.debug("Connection checked out from pool")
+        
+        @event.listens_for(self.engine, "checkin")
+        def receive_checkin(dbapi_connection, connection_record):
+            logger.debug("Connection checked in to pool")
+    
+    def _test_connection(self):
+        """Test database connection"""
+        try:
+            with self.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+            logger.info("Database connection test successful")
+        except Exception as e:
+            logger.error(f"Database connection test failed: {e}")
+            raise
+    
+    def get_session(self):
+        """Get database session"""
+        if not self.SessionLocal:
+            raise RuntimeError("Database not initialized")
+        return self.SessionLocal()
+    
+    def close(self):
+        """Close database connections"""
+        if self.engine:
+            self.engine.dispose()
+            logger.info("Database connections closed")
 
-DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "100"))
-WEB_CONCURRENCY = int(os.getenv("WEB_CONCURRENCY", "2"))
-POOL_SIZE = max(DB_POOL_SIZE // WEB_CONCURRENCY, 5)
+# Initialize database manager
+db_manager = DatabaseManager()
 
-# Create an engine without specifying the database to check if the database exists
-SQLALCHEMY_DATABASE_URL_WITHOUT_DB = (
-    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/"
-)
-
-engine_without_db = create_engine(SQLALCHEMY_DATABASE_URL_WITHOUT_DB)
-
-# Create database if it doesn't exist
-with engine_without_db.connect() as connection:
-    connection.execute(text(f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}`"))
-
-SQLALCHEMY_DATABASE_URL = (
-    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
-engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_size=POOL_SIZE, max_overflow=0)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Export for backward compatibility
+engine = db_manager.engine
+SessionLocal = db_manager.SessionLocal
 Base = declarative_base()

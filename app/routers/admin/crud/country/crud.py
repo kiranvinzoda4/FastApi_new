@@ -55,12 +55,13 @@ def create_country(db: Session, country: CountryCreate):
 
 
 def update_country(db: Session, country_id: str, country: CountryUpdate):
-    existing = db.query(CountryModel).filter(
-        CountryModel.code == country.code,
-        CountryModel.id != country_id,
-        CountryModel.is_deleted == False
-    ).first()
-    if existing:
+    existing = get_record(
+        db=db,
+        model_class=CountryModel,
+        filters={"code": country.code, "is_deleted": False},
+        exception=False
+    )
+    if existing and existing.id != country_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Country code already exists"

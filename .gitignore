@@ -1,11 +1,94 @@
-.scannerwork
-.vscode
-__pycache__
-venv
-app/uploads/*
-!app/uploads/__init__.py
-.python-version
+# Environment variables
 .env
-logs
-.rasa
+.env.local
+.env.production
+.env.staging
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Uploads
+uploads/
+app/uploads/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Secrets and keys
+*.pem
+*.key
+secrets/
+keys/
+
+# Backup files
+*.bak
+*.backup

@@ -1,66 +1,127 @@
-from fastapi import FastAPI, Request, status
+import logging
+import os
+import time
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-
-# from fastapi_utils.tasks import repeat_every
 from fastapi.staticfiles import StaticFiles
 from app.routers.admin import api as admin
-from fastapi.staticfiles import StaticFiles
-import os
+from app.config import settings
+from app.logging_config import setup_logging
+from app.database import db_manager
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting DailyVeg API")
+    yield
+    # Shutdown
+    logger.info("Shutting down DailyVeg API")
+    db_manager.close()
+
 app = FastAPI(
     title="DailyVeg API Portal",
-    description="APIs for DailyVeg",
+    description="Professional APIs for DailyVeg Platform",
     version="1.0.0",
-    # docs_url=None,
+    docs_url="/docs" if settings.DEBUG else None,
     redoc_url=None,
+    lifespan=lifespan
 )
 
-origins = ["*"]
+# Security middleware
+if not settings.DEBUG:
+    app.add_middleware(
+        TrustedHostMiddleware, 
+        allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]
+    )
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"]
 )
 
+# Rate limiting
+from app.middleware.rate_limit import setup_rate_limiting
+setup_rate_limiting(app)
+
+# Prometheus metrics
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    
+    # Log request
+    logger.info(f"Request: {request.method} {request.url}")
+    
+    response = await call_next(request)
+    
+    # Log response
+    process_time = time.time() - start_time
+    logger.info(
+        f"Response: {response.status_code} - {process_time:.4f}s"
+    )
+    
+    return response
 
 
+# Include routers
+from app.routers import health
+app.include_router(health.router)
 app.include_router(admin.router)
 
-
-app.mount(
-    "/app/uploads/images/vegetables",
-    StaticFiles(directory=os.path.join("app", "uploads", "images", "vegetables")),
-    name="vegetable_images"
+# Exception handlers
+from app.exceptions import (
+    CustomException, custom_exception_handler,
+    validation_exception_handler, http_exception_handler,
+    database_exception_handler, general_exception_handler
 )
+from sqlalchemy.exc import SQLAlchemyError
 
-app.mount(
-    "/static/info",
-    StaticFiles(directory=os.path.join("app", "static", "info")),
-    name="info_static"
-)
+app.add_exception_handler(CustomException, custom_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(SQLAlchemyError, database_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    error = exc.errors()[0]
-    loc = error.get("loc", [])
+# Static file mounts
+try:
+    if os.path.exists(os.path.join("app", "uploads", "images", "vegetables")):
+        app.mount(
+            "/app/uploads/images/vegetables",
+            StaticFiles(directory=os.path.join("app", "uploads", "images", "vegetables")),
+            name="vegetable_images"
+        )
     
-    # Safe extraction of the field name
-    if len(loc) >= 2:
-        field = str(loc[1])
-    elif len(loc) == 1:
-        field = str(loc[0])
-    else:
-        field = "unknown"
+    if os.path.exists(os.path.join("app", "static", "info")):
+        app.mount(
+            "/static/info",
+            StaticFiles(directory=os.path.join("app", "static", "info")),
+            name="info_static"
+        )
+except Exception as e:
+    logger.warning(f"Failed to mount static files: {e}")
 
-    message = error.get("msg", "Invalid input")
-    detail = f"{field} - {message.capitalize()}"
-
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=jsonable_encoder({"detail": detail}),
-    )
+# Root endpoint
+@app.get("/")
+async def root():
+    return {
+        "message": "DailyVeg API Portal",
+        "version": "1.0.0",
+        "docs": "/docs" if settings.DEBUG else "Documentation disabled in production"
+    }

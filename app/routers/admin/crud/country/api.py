@@ -1,57 +1,156 @@
-from fastapi import APIRouter, Query, Depends, Header, HTTPException, status
+import logging
 from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.dependencies import get_db
-
-from app.routers.admin.crud import admin_users
+from app.security import get_current_user
+from app.middleware.rate_limit import limiter
 from . import crud, schemas
 
-router = APIRouter()
-
-
-def admin_auth(token: str = Header(None), db: Session = Depends(get_db)):
-    """Token validation dependency."""
-    admin_users.verify_token(db, token=token)
-    return db
-
-
-@router.get("/countries", response_model=schemas.CountryList, tags=["Countries"])
-def get_countries(
-    start: int = 0,
-    limit: int = 10,
-    sort_by: Optional[str] = Query(None, max_length=50),
-    order: Optional[str] = Query(None, max_length=4, description="asc | desc"),
-    search: Optional[str] = Query(None, max_length=50),
-    db: Session = Depends(admin_auth),
-):
-    return crud.get_countries(db, start, limit, sort_by, order, search)
-
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/countries", tags=["Countries"])
 
 @router.get(
-    "/countries/{country_id}", response_model=schemas.Country, tags=["Countries"]
+    "/",
+    response_model=schemas.CountryList,
+    summary="Get all countries",
+    description="Retrieve a paginated list of countries with optional search and sorting"
 )
-def get_country(country_id: str, db: Session = Depends(admin_auth)):
-    return crud.get_country_by_id(db, country_id)
-
-
-@router.post("/countries", response_model=schemas.Country, tags=["Countries"])
-def create_country(
-    country_data: schemas.CountryCreate, db: Session = Depends(admin_auth)
+@limiter.limit("30/minute")
+async def get_countries(
+    request,
+    start: int = Query(0, ge=0, description="Starting index for pagination"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items to return"),
+    search: Optional[str] = Query(None, description="Search term for country name or code"),
+    sort_by: Optional[str] = Query(None, description="Field to sort by"),
+    order: Optional[str] = Query("asc", regex="^(asc|desc)$", description="Sort order"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
-    return crud.create_country(db, country_data)
+    """Get paginated list of countries with search and sorting capabilities"""
+    try:
+        result = crud.get_countries(
+            db=db,
+            start=start,
+            limit=limit,
+            search=search,
+            sort_by=sort_by,
+            order=order
+        )
+        logger.info(f"Retrieved {len(result['list'])} countries for user {current_user.get('sub')}")
+        return result
+    except Exception as e:
+        logger.error(f"Error retrieving countries: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve countries"
+        )
 
+@router.get(
+    "/{country_id}",
+    response_model=schemas.Country,
+    summary="Get country by ID",
+    description="Retrieve a specific country by its ID"
+)
+@limiter.limit("60/minute")
+async def get_country(
+    request,
+    country_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific country by ID"""
+    try:
+        country = crud.get_country_by_id(db, country_id)
+        logger.info(f"Retrieved country {country_id} for user {current_user.get('sub')}")
+        return country
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving country {country_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve country"
+        )
+
+@router.post(
+    "/",
+    response_model=schemas.Country,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create new country",
+    description="Create a new country with unique code"
+)
+@limiter.limit("10/minute")
+async def create_country(
+    request,
+    country: schemas.CountryCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new country"""
+    try:
+        new_country = crud.create_country(db=db, country=country)
+        logger.info(f"Created country {new_country.id} by user {current_user.get('sub')}")
+        return new_country
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating country: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create country"
+        )
 
 @router.put(
-    "/countries/{country_id}", response_model=schemas.Country, tags=["Countries"]
+    "/{country_id}",
+    response_model=schemas.Country,
+    summary="Update country",
+    description="Update an existing country"
 )
-def update_country(
+@limiter.limit("10/minute")
+async def update_country(
+    request,
     country_id: str,
-    country_data: schemas.CountryUpdate,
-    db: Session = Depends(admin_auth),
+    country: schemas.CountryUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
-    return crud.update_country(db, country_id, country_data)
+    """Update an existing country"""
+    try:
+        updated_country = crud.update_country(db=db, country_id=country_id, country=country)
+        logger.info(f"Updated country {country_id} by user {current_user.get('sub')}")
+        return updated_country
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating country {country_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update country"
+        )
 
-
-@router.delete("/countries/{country_id}", tags=["Countries"])
-def delete_country(country_id: str, db: Session = Depends(admin_auth)):
-    return crud.delete_country(db, country_id)
+@router.delete(
+    "/{country_id}",
+    summary="Delete country",
+    description="Soft delete a country (mark as deleted)"
+)
+@limiter.limit("5/minute")
+async def delete_country(
+    request,
+    country_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a country (soft delete)"""
+    try:
+        result = crud.delete_country(db=db, country_id=country_id)
+        logger.info(f"Deleted country {country_id} by user {current_user.get('sub')}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting country {country_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete country"
+        )
