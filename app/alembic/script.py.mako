@@ -17,8 +17,34 @@ depends_on = ${repr(depends_on)}
 
 
 def upgrade():
-    ${upgrades if upgrades else "pass"}
+    # Start explicit transaction
+    connection = op.get_bind()
+    trans = connection.begin()
+    
+    try:
+        ${upgrades if upgrades else "pass"}
+        
+        # Commit if all successful
+        trans.commit()
+        
+    except Exception as e:
+        # Rollback on any error
+        trans.rollback()
+        raise e
 
 
 def downgrade():
-    ${downgrades if downgrades else "pass"}
+    # Start explicit transaction
+    connection = op.get_bind()
+    trans = connection.begin()
+    
+    try:
+        ${downgrades if downgrades else "pass"}
+        
+        # Commit if all successful
+        trans.commit()
+        
+    except Exception as e:
+        # Rollback on any error
+        trans.rollback()
+        raise e

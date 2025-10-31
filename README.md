@@ -35,7 +35,7 @@
 
 5. **Start Development Server**
    ```bash
-   python scripts/dev.py
+   python dev.py
    # OR
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```

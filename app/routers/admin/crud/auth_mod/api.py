@@ -83,18 +83,3 @@ def otp_verify(request: OTPVerifyRequest, db: Session = Depends(get_db)):
 def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     return crud.reset_password(db, request=request)
 
-
-@router.get("/error-logs", response_model=APILogList, tags=["Error Logs"])
-def get_error_logs(
-    token: str = Header(None),
-    start: int = 0,
-    limit: int = 10,
-    sort_by: Optional[str] = Query(
-        None, max_length=50, description="created_at | status_code"
-    ),
-    order: Optional[str] = Query(None, max_length=4, description="asc | desc"),
-    db: Session = Depends(get_db),
-):
-    crud.verify_token(db, token=token)
-    # TODO: Implement error logs functionality
-    raise HTTPException(status_code=501, detail="Not implemented")

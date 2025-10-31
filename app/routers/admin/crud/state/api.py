@@ -3,15 +3,14 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.dependencies import get_db
 
-from app.routers.admin.crud import admin_users
+from app.security import get_current_user
 from . import crud, schemas
 
 router = APIRouter()
 
 
-def admin_auth(token: str = Header(None), db: Session = Depends(get_db)):
+def admin_auth(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Token validation dependency."""
-    admin_users.verify_token(db, token=token)
     return db
 
 

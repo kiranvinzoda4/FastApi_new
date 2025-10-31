@@ -13,6 +13,8 @@ from app.routers.admin import api as admin
 from app.config import settings
 from app.logging_config import setup_logging
 from app.database import db_manager
+from app.project_info import PROJECT_NAME, PROJECT_DESCRIPTION, PROJECT_VERSION
+from app.middleware.error_logging import ErrorLoggingMiddleware
 
 # Setup logging
 setup_logging()
@@ -21,16 +23,16 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting DailyVeg API")
+    logger.info(f"Starting {PROJECT_NAME}")
     yield
     # Shutdown
-    logger.info("Shutting down DailyVeg API")
+    logger.info(f"Shutting down {PROJECT_NAME}")
     db_manager.close()
 
 app = FastAPI(
-    title="DailyVeg API Portal",
-    description="Professional APIs for DailyVeg Platform",
-    version="1.0.0",
+    title=PROJECT_NAME,
+    description=PROJECT_DESCRIPTION,
+    version=PROJECT_VERSION,
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url=None,
     lifespan=lifespan
@@ -53,9 +55,10 @@ app.add_middleware(
     expose_headers=["X-Total-Count"]
 )
 
-# Rate limiting
-from app.middleware.rate_limit import setup_rate_limiting
-setup_rate_limiting(app)
+# Error logging middleware
+app.add_middleware(ErrorLoggingMiddleware)
+
+# Rate limiting disabled
 
 # Prometheus metrics
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -121,7 +124,7 @@ except Exception as e:
 @app.get("/")
 async def root():
     return {
-        "message": "DailyVeg API Portal",
-        "version": "1.0.0",
+        "message": PROJECT_NAME,
+        "version": PROJECT_VERSION,
         "docs": "/docs" if settings.DEBUG else "Documentation disabled in production"
     }
