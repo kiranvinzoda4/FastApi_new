@@ -1,13 +1,11 @@
-import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
 from app.config import settings
+from app.core.error_handler import handle_errors
 from pydantic import BaseModel
-
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/health", tags=["Health Check"])
 
 class HealthResponse(BaseModel):
@@ -34,6 +32,7 @@ async def health_check():
     )
 
 @router.get("/detailed", response_model=DetailedHealthResponse)
+@handle_errors
 async def detailed_health_check(db: Session = Depends(get_db)):
     """Detailed health check with service status"""
     
@@ -41,8 +40,7 @@ async def detailed_health_check(db: Session = Depends(get_db)):
     db_healthy = True
     try:
         db.execute(text("SELECT 1"))
-    except Exception as e:
-        logger.error(f"Database health check failed: {e}")
+    except Exception:
         db_healthy = False
     
     # Check email service configuration

@@ -1,58 +1,33 @@
 import smtplib
-import logging
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
-from typing import List, Optional
+from typing import List, Generator
 from contextlib import contextmanager
-from fastapi import HTTPException, status
 from app.config import settings
-
-logger = logging.getLogger(__name__)
+from app.core.error_handler import handle_errors
 
 class EmailService:
-    def __init__(self):
-        self.smtp_host = settings.SMTP_HOST
-        self.smtp_port = settings.SMTP_PORT
-        self.smtp_user = settings.SMTP_USER
-        self.smtp_password = settings.SMTP_PASSWORD
+    def __init__(self) -> None:
+        self.smtp_host: str = settings.SMTP_HOST
+        self.smtp_port: int = settings.SMTP_PORT
+        self.smtp_user: str = settings.SMTP_USER
+        self.smtp_password: str = settings.SMTP_PASSWORD
     
     @contextmanager
-    def _get_smtp_connection(self):
+    def _get_smtp_connection(self) -> Generator[smtplib.SMTP, None, None]:
         """Context manager for SMTP connection"""
-        server = None
+        server = smtplib.SMTP(self.smtp_host, self.smtp_port)
+        server.starttls()
+        if self.smtp_user and self.smtp_password:
+            server.login(self.smtp_user, self.smtp_password)
         try:
-            server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-            server.starttls()
-            if self.smtp_user and self.smtp_password:
-                server.login(self.smtp_user, self.smtp_password)
             yield server
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error(f"SMTP authentication failed: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Email authentication failed"
-            )
-        except smtplib.SMTPException as e:
-            logger.error(f"SMTP error: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Email service error"
-            )
-        except Exception as e:
-            logger.error(f"SMTP connection error: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Email connection failed"
-            )
         finally:
-            if server:
-                try:
-                    server.quit()
-                except Exception as e:
-                    logger.warning(f"Error closing SMTP connection: {e}")
+            server.quit()
     
+    @handle_errors
     def send_email(
         self, 
         recipients: List[str], 
@@ -60,64 +35,40 @@ class EmailService:
         html_body: str,
         attach_logo: bool = True
     ) -> bool:
-        """
-        Send an email to the specified recipients.
-        
-        Args:
-            recipients: List of recipient email addresses
-            subject: Email subject
-            html_body: HTML email body content
-            attach_logo: Whether to attach logo image
-        
-        Returns:
-            bool: True if email sent successfully, False otherwise
-        """
+        """Send an email to the specified recipients"""
         if not self.smtp_user or not self.smtp_password:
-            logger.warning("Email credentials not configured")
-            return False
+            raise ValueError("Email credentials not configured")
         
         if not recipients:
-            logger.warning("No recipients specified")
-            return False
+            raise ValueError("No recipients specified")
         
-        try:
-            msg = MIMEMultipart("related")
-            msg["From"] = self.smtp_user
-            msg["To"] = ", ".join(recipients)
-            msg["Subject"] = subject
-            
-            msg_alternative = MIMEMultipart("alternative")
-            msg.attach(msg_alternative)
-            msg_alternative.attach(MIMEText(html_body, "html"))
-            
-            # Attach logo image if requested
-            if attach_logo:
-                self._attach_logo(msg)
-            
-            # Send email
-            with self._get_smtp_connection() as server:
-                server.sendmail(self.smtp_user, recipients, msg.as_string())
-            
-            logger.info(f"Email sent successfully to {len(recipients)} recipients")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Email sending failed: {e}")
-            return False
+        msg = MIMEMultipart("related")
+        msg["From"] = self.smtp_user
+        msg["To"] = ", ".join(recipients)
+        msg["Subject"] = subject
+        
+        msg_alternative = MIMEMultipart("alternative")
+        msg.attach(msg_alternative)
+        msg_alternative.attach(MIMEText(html_body, "html"))
+        
+        if attach_logo:
+            self._attach_logo(msg)
+        
+        with self._get_smtp_connection() as server:
+            server.sendmail(self.smtp_user, recipients, msg.as_string())
+        
+        return True
     
     def _attach_logo(self, msg: MIMEMultipart) -> None:
         """Attach logo image to email"""
         logo_path = os.path.join("app", "static", "images", "logo", "logo.png")
-        try:
-            if os.path.exists(logo_path):
-                with open(logo_path, "rb") as img_file:
-                    img = MIMEImage(img_file.read())
+        if os.path.exists(logo_path):
+            with open(logo_path, "rb") as img_file:
+                img_data = img_file.read()
+                if img_data:
+                    img = MIMEImage(img_data)
                     img.add_header("Content-ID", "<logo_image>")
                     msg.attach(img)
-            else:
-                logger.warning(f"Logo image not found at {logo_path}")
-        except Exception as e:
-            logger.error(f"Error attaching logo: {e}")
 
 # Global email service instance
 email_service = EmailService()

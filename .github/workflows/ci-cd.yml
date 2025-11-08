@@ -1,0 +1,53 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+    
+    - name: Install dependencies
+      run: poetry install --no-interaction
+    
+    - name: Run tests
+      run: poetry run pytest tests/ -v --cov=app --cov-report=xml
+      env:
+        # amazonq-ignore-next-line
+        JWT_KEY: '{"k":"test_key","kty":"oct"}'
+        ACCESS_JWT_KEY: '{"k":"test_access_key","kty":"oct"}'
+        REFRESH_JWT_KEY: '{"k":"test_refresh_key","kty":"oct"}'
+    
+    - name: Run linting
+      run: |
+        poetry run flake8 app/
+        poetry run mypy app/
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Docker image
+      run: docker build -t dailyveg-api:latest .

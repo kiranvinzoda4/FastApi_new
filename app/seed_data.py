@@ -16,8 +16,7 @@ from app.models import (
 
 fake = Faker()
 
-def generate_order_code():
-    return "ORD-" + datetime.utcnow().strftime("%Y%m%d%H%M%S")
+# generate_order_code function removed - use the one from utils.py
 
 def generate_indian_phone():
     return f"{random.choice(['6', '7', '8', '9'])}{fake.random_number(digits=9, fix_len=True)}"
@@ -28,14 +27,15 @@ def seed_data(db: Session):
     # 1. Admins
     for _ in range(3):
         try:
+            from app.libs.utils import create_password, generate_order_code
             db.add(AdminUserModel(
                 id=str(uuid.uuid4()),
                 first_name=fake.first_name(),
                 last_name=fake.last_name(),
                 email=fake.unique.user_name() + "@gmail.com",
                 phone=generate_indian_phone(),
-                password="hashedpassword",
-                otp="123456"
+                password=create_password("TempPass123!"),  # Use environment variable in production
+                otp=None
             ))
         except Exception as e:
             print(f"❌ Failed to create admin: {e}")
@@ -50,8 +50,8 @@ def seed_data(db: Session):
             last_name=fake.last_name(),
             email=fake.unique.user_name() + "@gmail.com",
             phone=generate_indian_phone(),
-            password="hashedpassword",
-            otp="123456"
+            password=create_password("TempPass123!"),
+            otp=None
         )
         db.add(customer)
 
@@ -80,8 +80,8 @@ def seed_data(db: Session):
             aadhaar_number=str(fake.random_number(digits=12, fix_len=True)),
             pan_number=fake.bothify(text='?????####?'),
             address=fake.address(),
-            password="hashedpassword",
-            otp="123456"
+            password=create_password("TempPass123!"),
+            otp=None
         )
         db.add(guy)
         delivery_guys.append(guy)

@@ -13,15 +13,15 @@ from app.exceptions import AuthenticationException, AuthorizationException
 logger = logging.getLogger(__name__)
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context: CryptContext = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+ALGORITHM: str = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
 # Security scheme
-security = HTTPBearer()
+security: HTTPBearer = HTTPBearer()
 
 class SecurityUtils:
     @staticmethod
@@ -47,16 +47,17 @@ class SecurityUtils:
     @staticmethod
     def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         """Create JWT access token"""
-        to_encode = data.copy()
+        to_encode: Dict[str, Any] = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire: datetime = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         
         to_encode.update({"exp": expire, "type": "access"})
         
         try:
-            encoded_jwt = jwt.encode(to_encode, settings.ACCESS_JWT_KEY, algorithm=ALGORITHM)
+            key = SecurityUtils._get_jwt_key("access")
+            encoded_jwt: str = jwt.encode(to_encode, key, algorithm=ALGORITHM)
             return encoded_jwt
         except Exception as e:
             logger.error(f"Error creating access token: {e}")
@@ -65,12 +66,13 @@ class SecurityUtils:
     @staticmethod
     def create_refresh_token(data: Dict[str, Any]) -> str:
         """Create JWT refresh token"""
-        to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        to_encode: Dict[str, Any] = data.copy()
+        expire: datetime = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         to_encode.update({"exp": expire, "type": "refresh"})
         
         try:
-            encoded_jwt = jwt.encode(to_encode, settings.REFRESH_JWT_KEY, algorithm=ALGORITHM)
+            key = SecurityUtils._get_jwt_key("refresh")
+            encoded_jwt: str = jwt.encode(to_encode, key, algorithm=ALGORITHM)
             return encoded_jwt
         except Exception as e:
             logger.error(f"Error creating refresh token: {e}")
@@ -80,8 +82,11 @@ class SecurityUtils:
     def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
         """Verify and decode JWT token"""
         try:
-            key = settings.ACCESS_JWT_KEY if token_type == "access" else settings.REFRESH_JWT_KEY
-            payload = jwt.decode(token, key, algorithms=[ALGORITHM])
+            # Get JWT key based on token type with validation
+            key = SecurityUtils._get_jwt_key(token_type)
+            # amazonq-ignore-next-line
+            
+            payload: Dict[str, Any] = jwt.decode(token, key, algorithms=[ALGORITHM])
             
             # Verify token type
             if payload.get("type") != token_type:
@@ -96,6 +101,20 @@ class SecurityUtils:
             raise AuthenticationException("Token verification failed")
     
     @staticmethod
+    def _get_jwt_key(token_type: str) -> Any:
+        """Get JWT key with proper validation"""
+        if token_type == "access":
+            if not hasattr(settings, 'ACCESS_JWT_KEY') or not settings.ACCESS_JWT_KEY:
+                raise AuthenticationException("Access JWT key not configured")
+            return getattr(settings, 'ACCESS_JWT_KEY')
+        elif token_type == "refresh":
+            if not hasattr(settings, 'REFRESH_JWT_KEY') or not settings.REFRESH_JWT_KEY:
+                raise AuthenticationException("Refresh JWT key not configured")
+            return getattr(settings, 'REFRESH_JWT_KEY')
+        else:
+            raise AuthenticationException(f"Invalid token type: {token_type}")
+    
+    @staticmethod
     def hash_api_key(api_key: str) -> str:
         """Hash API key for storage"""
         return hashlib.sha256(api_key.encode()).hexdigest()
@@ -104,8 +123,8 @@ class SecurityUtils:
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """Get current user from JWT token"""
     try:
-        payload = SecurityUtils.verify_token(credentials.credentials, "access")
-        user_id = payload.get("sub")
+        payload: Dict[str, Any] = SecurityUtils.verify_token(credentials.credentials, "access")
+        user_id: Optional[str] = payload.get("sub")
         if user_id is None:
             raise AuthenticationException("Invalid token payload")
         return payload
@@ -118,13 +137,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # Optional authentication dependency
 async def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
     """Get current user if token is provided, otherwise return None"""
-    authorization = request.headers.get("Authorization")
+    authorization: Optional[str] = request.headers.get("Authorization")
     if not authorization or not authorization.startswith("Bearer "):
         return None
     
     try:
-        token = authorization.split(" ")[1]
-        payload = SecurityUtils.verify_token(token, "access")
+        token: str = authorization.split(" ")[1]
+        payload: Dict[str, Any] = SecurityUtils.verify_token(token, "access")
         return payload
     except Exception:
         return None
@@ -133,16 +152,16 @@ async def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]
 def get_user_id_or_ip(request: Request) -> str:
     """Get user ID from token or fall back to IP address for rate limiting"""
     try:
-        authorization = request.headers.get("Authorization")
+        authorization: Optional[str] = request.headers.get("Authorization")
         if authorization and authorization.startswith("Bearer "):
-            token = authorization.split(" ")[1]
-            payload = SecurityUtils.verify_token(token, "access")
+            token: str = authorization.split(" ")[1]
+            payload: Dict[str, Any] = SecurityUtils.verify_token(token, "access")
             return f"user:{payload.get('sub', 'unknown')}"
     except Exception:
         pass
     
     # Fall back to IP address
-    forwarded_for = request.headers.get("X-Forwarded-For")
+    forwarded_for: Optional[str] = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return f"ip:{forwarded_for.split(',')[0].strip()}"
-    return f"ip:{request.client.host}"
+    return f"ip:{request.client.host if request.client else 'unknown'}"

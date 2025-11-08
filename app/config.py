@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 100
     WEB_CONCURRENCY: int = 2
     
-    # JWT Keys
+    # JWT Keys - Required for security
     JWT_KEY: str
-    ACCESS_JWT_KEY: str
+    ACCESS_JWT_KEY: str  
     REFRESH_JWT_KEY: str
     
     # Email
@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     
+    # Admin User (for seeding) - SECURITY: No password in config, use secure reset flow
+    ADMIN_EMAIL: str = ""
+    # ADMIN_PASSWORD removed - use password reset links instead of hardcoded passwords
+    
     # Application
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
@@ -39,11 +43,16 @@ class Settings(BaseSettings):
     
     @validator('JWT_KEY', 'ACCESS_JWT_KEY', 'REFRESH_JWT_KEY')
     def validate_jwt_keys(cls, v):
+        if not v or v.strip() == "":
+            raise ValueError("JWT key cannot be empty - must be configured in environment")
         try:
-            return json.loads(v)
+            parsed_key = json.loads(v)
+            if not isinstance(parsed_key, dict) or 'k' not in parsed_key:
+                raise ValueError("JWT key must be valid JWK format with 'k' field")
+            return parsed_key
         except (json.JSONDecodeError, TypeError) as e:
             logger.error(f"Invalid JWT key format: {e}")
-            raise ValueError("JWT key must be valid JSON")
+            raise ValueError("JWT key must be valid JSON in JWK format")
     
     @validator('CORS_ORIGINS')
     def validate_cors_origins(cls, v):
@@ -57,8 +66,14 @@ class Settings(BaseSettings):
 
 try:
     settings = Settings()
+except ValueError as e:
+    logger.error(f"Configuration validation error: {e}")
+    raise RuntimeError(f"Invalid configuration: {e}")
+except FileNotFoundError as e:
+    logger.error(f"Environment file not found: {e}")
+    raise RuntimeError(f"Environment configuration missing: {e}")
 except Exception as e:
-    logger.error(f"Configuration error: {e}")
+    logger.error(f"Unexpected configuration error: {e}")
     raise RuntimeError(f"Failed to load configuration: {e}")
 
 # Export for backward compatibility

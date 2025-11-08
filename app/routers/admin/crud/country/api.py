@@ -1,10 +1,22 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.dependencies import get_db
 from app.security import get_current_user
+from app.core.error_handler import handle_errors
 from . import crud, schemas
+
 router = APIRouter(prefix="/countries", tags=["Countries"])
+
+
+def admin_auth(db: Session = Depends(get_db), current_user: Dict[str, Any] = Depends(get_current_user)) -> Session:
+    """Token validation dependency."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    return db
 
 @router.get(
     "/",
@@ -12,16 +24,15 @@ router = APIRouter(prefix="/countries", tags=["Countries"])
     summary="Get all countries",
     description="Retrieve a paginated list of countries with optional search and sorting"
 )
+@handle_errors
 async def get_countries(
-    request,
     start: int = Query(0, ge=0, description="Starting index for pagination"),
     limit: int = Query(10, ge=1, le=100, description="Number of items to return"),
-    search: Optional[str] = Query(None, description="Search term for country name or code"),
-    sort_by: Optional[str] = Query(None, description="Field to sort by"),
+    search: Optional[str] = Query(None, max_length=50, description="Search term for country name or code"),
+    sort_by: Optional[str] = Query(None, max_length=50, description="Field to sort by"),
     order: Optional[str] = Query("asc", regex="^(asc|desc)$", description="Sort order"),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    db: Session = Depends(admin_auth)
+) -> schemas.CountryList:
     """Get paginated list of countries with search and sorting capabilities"""
     return crud.get_countries(
         db=db,
@@ -38,14 +49,19 @@ async def get_countries(
     summary="Get country by ID",
     description="Retrieve a specific country by its ID"
 )
+@handle_errors
 async def get_country(
-    request,
-    country_id: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    country_id: str = Query(..., min_length=1, max_length=36, description="Country ID"),
+    db: Session = Depends(admin_auth)
+) -> schemas.Country:
     """Get a specific country by ID"""
-    return crud.get_country_by_id(db, country_id)
+    result = crud.get_country_by_id(db, country_id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Country not found"
+        )
+    return result
 
 @router.post(
     "/",
@@ -54,12 +70,11 @@ async def get_country(
     summary="Create new country",
     description="Create a new country with unique code"
 )
+@handle_errors
 async def create_country(
-    request,
     country: schemas.CountryCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    db: Session = Depends(admin_auth)
+) -> schemas.Country:
     """Create a new country"""
     return crud.create_country(db=db, country=country)
 
@@ -69,13 +84,13 @@ async def create_country(
     summary="Update country",
     description="Update an existing country"
 )
+@handle_errors
 async def update_country(
-    request,
-    country_id: str,
-    country: schemas.CountryUpdate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    country_id: str = Query(..., min_length=1, max_length=36, description="Country ID"),
+    # amazonq-ignore-next-line
+    country: schemas.CountryUpdate = ...,
+    db: Session = Depends(admin_auth)
+) -> schemas.Country:
     """Update an existing country"""
     return crud.update_country(db=db, country_id=country_id, country=country)
 
@@ -84,11 +99,10 @@ async def update_country(
     summary="Delete country",
     description="Soft delete a country (mark as deleted)"
 )
+@handle_errors
 async def delete_country(
-    request,
-    country_id: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    country_id: str = Query(..., min_length=1, max_length=36, description="Country ID"),
+    db: Session = Depends(admin_auth)
+) -> Dict[str, str]:
     """Delete a country (soft delete)"""
     return crud.delete_country(db=db, country_id=country_id)

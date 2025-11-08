@@ -34,7 +34,18 @@ class AdminUserModel(Base, IDMixin, TimestampMixin, SoftDeleteMixin):
     email = Column(String(100), nullable=False, unique=True)
     phone = Column(String(15))
     password = Column(String(255), nullable=False)
-    otp = Column(String(6))
+    
+    # OTP fields with security
+    otp = Column(String(64))  # Store hashed OTP
+    otp_expires_at = Column(DateTime)
+    otp_attempts = Column(Integer, default=0)
+    otp_generated_at = Column(DateTime)
+    otp_generation_count = Column(Integer, default=0)
+    
+    # Password reset token fields
+    reset_token = Column(String(64))  # Secure reset token
+    reset_token_expires_at = Column(DateTime)
+    reset_token_used = Column(Boolean, default=False)
 
 
 class APILogModel(Base, IDMixin):

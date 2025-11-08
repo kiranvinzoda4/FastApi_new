@@ -1,85 +1,105 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from app.dependencies import get_db
-from app.libs.utils import get_user_type
-
-# Import error_logs functions - need to be implemented
-# from app.routers.admin.crud import error_logs
-from .schemas import (
-    LoginRequest,
-    LoginResponse,
-    TokenResponse,
-    RefreshTokenRequest,
-    Profile,
-    ProfileUpdate,
-    ChangePassword,
-    ForgotPasswordRequest,
-    OTPVerifyRequest,
-    OTPVerifyResponse,
-    ResetPasswordRequest,
-    APILogList,
+from app.database import db_manager
+from app.routers.admin.crud.auth_mod import crud
+from app.routers.admin.crud.auth_mod.schemas import (
+    LoginRequest, LoginResponse, Profile, ChangePassword, 
+    ForgotPasswordRequest, OTPVerifyRequest, ResetPasswordRequest,
+    ResetPasswordWithTokenRequest, VerifyResetTokenRequest
 )
-from . import crud
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+def get_db():
+    # amazonq-ignore-next-line
+    db = db_manager.get_session()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@router.post(
-    "/admin-login",
-    status_code=status.HTTP_200_OK,
-    response_model=LoginResponse,
-    tags=["Authentication"],
-)
-def admin_login(admin_user: LoginRequest, db: Session = Depends(get_db)):
-    return crud.sign_in(db, admin_user)
+@router.post("/login", response_model=LoginResponse)
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    """Admin user login"""
+    # amazonq-ignore-next-line
+    return crud.sign_in(db, request)
 
-
-@router.post(
-    "/refresh-access-token",
-    status_code=status.HTTP_200_OK,
-    response_model=TokenResponse,
-    tags=["Authentication"],
-)
-def refresh_access_token(request: RefreshTokenRequest, db: Session = Depends(get_db)):
-    # TODO: Implement refresh_access_token function
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
-@router.get("/admin-profile", response_model=Profile, tags=["Profile"])
-def get_admin_profile(token: str = Header(None), db: Session = Depends(get_db)):
-    return crud.verify_token(db, token=token)
-
-
-@router.put("/admin-profile", response_model=Profile, tags=["Profile"])
-def update_admin_profile(
-    admin_user: ProfileUpdate, token: str = Header(None), db: Session = Depends(get_db)
+@router.put("/profile")
+async def update_profile(
+    request: Profile, 
+    # amazonq-ignore-next-line
+    token: str,
+    db: Session = Depends(get_db)
 ):
-    return crud.update_profile(db, admin_user=admin_user, token=token)
+    """Update admin user profile"""
+    return crud.update_profile(db, request, token)
 
-
-@router.put("/admin-change-password", tags=["Profile"])
-def change_admin_password(
-    admin_user: ChangePassword, token: str = Header(None), db: Session = Depends(get_db)
+@router.put("/change-password")
+async def change_password(
+    request: ChangePassword,
+    token: str,
+    db: Session = Depends(get_db)
 ):
-    crud.verify_token(db, token=token)
-    crud.change_password(db, admin_user=admin_user, token=token)
-    return {"detail": "Password changed successfully."}
+    """Change admin user password"""
+    return crud.change_password(db, request, token)
 
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """Send OTP for password reset (legacy)"""
+    return crud.send_forgot_password_email(db, request)
 
-@router.put("/send-forgot-password-email", tags=["Profile"])
-def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    return crud.send_forgot_password_email(db, request=request)
+@router.post("/forgot-password-link")
+async def forgot_password_link(
+    request: ForgotPasswordRequest,
+    http_request: Request,
+    db: Session = Depends(get_db)
+):
+    """Send secure password reset link"""
+    # Get base URL from request
+    # amazonq-ignore-next-line
+    base_url = f"{http_request.url.scheme}://{http_request.url.netloc}"
+    return crud.send_password_reset_link(db, request, base_url)
 
+@router.post("/verify-otp")
+async def verify_otp(
+    request: OTPVerifyRequest,
+    db: Session = Depends(get_db)
+):
+    """Verify OTP (legacy)"""
+    return crud.otp_verify(db, request)
 
-@router.put(
-    "/forgot-password-otp-verify", response_model=OTPVerifyResponse, tags=["Profile"]
-)
-def otp_verify(request: OTPVerifyRequest, db: Session = Depends(get_db)):
-    return crud.otp_verify(db, request=request)
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """Reset password with OTP (legacy)"""
+    return crud.reset_password(db, request)
 
+@router.post("/verify-reset-token")
+async def verify_reset_token(
+    request: VerifyResetTokenRequest,
+    db: Session = Depends(get_db)
+):
+    # amazonq-ignore-next-line
+    """Verify reset token validity"""
+    # amazonq-ignore-next-line
+    user = crud.verify_reset_token_and_get_user(db, request.token)
+    # amazonq-ignore-next-line
+    return {
+        "valid": True,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name
+    }
 
-@router.put("/reset-password", response_model=Profile, tags=["Profile"])
-def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
-    return crud.reset_password(db, request=request)
-
+@router.post("/reset-password-with-token")
+async def reset_password_with_token(
+    request: ResetPasswordWithTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """Reset password using secure token"""
+    return crud.reset_password_with_token(db, request.token, request.new_password)

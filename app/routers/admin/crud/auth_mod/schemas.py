@@ -1,78 +1,62 @@
-from typing import List
-from pydantic import BaseModel, Field, model_validator
-from fastapi import HTTPException, status
-from app.routers.admin.crud.schemas import EmailMixin, IDMixin, PhoneMixin, PasswordMixin, UserTypeMixin, ListResponseMixin
+from pydantic import BaseModel, EmailStr, validator
+from typing import Optional
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
-class LoginRequest(EmailMixin):
-    password: str = Field(min_length=6, max_length=50)
-
-
-class LoginResponse(EmailMixin, IDMixin):
+class LoginResponse(BaseModel):
+    id: str
     first_name: str
     last_name: str
+    email: str
+    phone: Optional[str] = None
     token: str
     refresh_token: str
 
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-
-
-class RefreshTokenRequest(BaseModel):
-    refresh_token: str
-
-
-class ProfileUpdate(EmailMixin, PhoneMixin):
-    first_name: str = Field(min_length=1, max_length=100)
-    last_name: str = Field(min_length=1, max_length=100)
-
-
-class Profile(ProfileUpdate, IDMixin):
-    pass
-
+class Profile(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    phone: Optional[str] = None
 
 class ChangePassword(BaseModel):
-    old_password: str = Field(min_length=8, max_length=255)
-    new_password: str = Field(min_length=8, max_length=255)
-    conform_new_password: str = Field(min_length=8, max_length=255)
+    old_password: str
+    new_password: str
+    
+    @validator('new_password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
 
-    @model_validator(mode="after")
-    def passwords_match(self):
-        if self.new_password != self.conform_new_password:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="New password and confirm password do not match.",
-            )
-        return self
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
 
-
-class ForgotPasswordRequest(EmailMixin, UserTypeMixin):
-    pass
-
-
-class OTPVerifyRequest(UserTypeMixin):
+class OTPVerifyRequest(BaseModel):
     otp: str
+    user_type: str
 
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+    
+    @validator('new_password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
 
-class OTPVerifyResponse(OTPVerifyRequest, EmailMixin):
-    pass
+class ResetPasswordWithTokenRequest(BaseModel):
+    token: str
+    new_password: str
+    
+    @validator('new_password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
 
-
-class ResetPasswordRequest(OTPVerifyResponse, PasswordMixin):
-    pass
-
-
-class APILogItem(BaseModel):
-    id: str
-    url: str
-    method: str
-    payload: str | None
-    status_code: int
-    error_message: str | None
-    created_at: str
-
-
-class APILogList(ListResponseMixin):
-    list: List[APILogItem]
+class VerifyResetTokenRequest(BaseModel):
+    token: str

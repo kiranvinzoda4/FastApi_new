@@ -101,19 +101,87 @@ poetry run alembic history
 
 ## 🧪 Testing
 
+### Quick Start
 ```bash
 # Run all tests
-poetry run pytest
+make test
 
-# Run with coverage
-poetry run pytest --cov=app
+# Run unit tests only
+make test-unit
 
-# Run specific test file
-poetry run pytest tests/test_health.py
+# Run integration tests only
+make test-integration
 
-# Run with verbose output
-poetry run pytest -v
+# Run with detailed coverage report
+make test-coverage
 ```
+
+### Detailed Testing Commands
+
+#### Using Make (Recommended)
+```bash
+make test           # All tests with coverage
+make test-unit      # Unit tests only
+make test-integration # Integration tests only
+make test-coverage  # Tests with HTML coverage report
+```
+
+#### Using Poetry Directly
+```bash
+# All tests with coverage
+poetry run pytest tests/ -v --cov=app --cov-report=term-missing
+
+# Unit tests only
+poetry run pytest tests/unit/ -v
+
+# Integration tests only
+poetry run pytest tests/integration/ -v
+
+# Specific test file
+poetry run pytest tests/unit/test_security.py -v
+
+# Specific test method
+poetry run pytest tests/unit/test_security.py::TestSecurityUtils::test_hash_password -v
+
+# Run tests with markers
+poetry run pytest -m "unit" -v
+poetry run pytest -m "integration" -v
+```
+
+#### Using Custom Test Runner
+```bash
+# Run test runner script
+python tests/test_runner.py --type unit
+python tests/test_runner.py --type integration
+python tests/test_runner.py --type all --no-coverage
+```
+
+### Test Structure
+```
+tests/
+├── fixtures/
+│   └── test_data.py          # Test data factory
+├── unit/
+│   ├── test_security.py      # Security utilities tests
+│   ├── test_utils.py         # Utility functions tests
+│   ├── test_email_templates.py # Email template tests
+│   └── test_models.py        # Database model tests
+├── integration/
+│   ├── test_auth_api.py      # Authentication API tests
+│   └── test_health_api.py    # Health check API tests
+└── conftest.py               # Test configuration & fixtures
+```
+
+### Coverage Requirements
+- **Minimum Coverage**: 80%
+- **Coverage Reports**: Terminal + HTML (htmlcov/)
+- **Excluded Files**: Migrations, test files
+
+### Test Configuration
+- **Database**: SQLite (isolated for tests)
+- **Fixtures**: Comprehensive test data factory
+- **Mocking**: Database config mocked for fast execution
+- **Markers**: `unit`, `integration`, `slow`, `auth`, `email`
 
 ## 📊 API Documentation
 
@@ -170,13 +238,41 @@ docker run -d \
 
 ```bash
 # Format code
-poetry run black app/
+make format
+# OR
+poetry run black app/ tests/
 
 # Lint code
+make lint
+# OR
 poetry run flake8 app/
-
-# Type checking
 poetry run mypy app/
+
+# Clean up generated files
+make clean
+```
+
+### Development Workflow
+
+```bash
+# 1. Install dependencies
+make install
+
+# 2. Run tests
+make test
+
+# 3. Check code quality
+make lint
+make format
+
+# 4. Start development server
+make dev
+
+# 5. Run migrations
+make migrate
+
+# 6. Seed test data
+make seed
 ```
 
 ### Project Structure
@@ -208,6 +304,16 @@ app/
 4. Add tests for new functionality
 5. Ensure all tests pass
 6. Submit a pull request
+
+## 📚 Documentation
+
+- **[Testing Guide](TESTING.md)** - Comprehensive testing documentation
+- **[API Guide](API_GUIDE.md)** - Detailed API documentation with examples
+- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment instructions
+- **[Architecture Guide](ARCHITECTURE.md)** - System architecture and design patterns
+- **[Performance Guide](PERFORMANCE.md)** - Optimization and monitoring guidelines
+- **[API Documentation](http://localhost:8000/docs)** - Swagger UI (when server is running)
+- **[Health Checks](http://localhost:8000/health)** - System status endpoints
 
 ## 📄 License
 

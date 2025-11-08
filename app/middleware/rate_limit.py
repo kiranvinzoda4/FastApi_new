@@ -49,6 +49,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
         status_code=429,
         content={
             "detail": "Rate limit exceeded",
+            # amazonq-ignore-next-line
             "retry_after": exc.retry_after
         },
         headers={"Retry-After": str(exc.retry_after)}

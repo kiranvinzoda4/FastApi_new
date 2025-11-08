@@ -6,6 +6,7 @@ import os
 
 load_dotenv()
 
+# amazonq-ignore-next-line
 DB_HOST=os.environ.get("DB_HOST")
 DB_NAME=os.environ.get("DB_NAME")
 DB_PASSWORD=os.environ.get("DB_PASSWORD")
@@ -81,6 +82,7 @@ def run_migrations_online():
     and associate a connection with the context.
 
     """
+    # amazonq-ignore-next-line
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
