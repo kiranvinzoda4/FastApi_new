@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from typing import List, Optional
 from contextlib import contextmanager
+from fastapi import HTTPException, status
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -27,9 +28,24 @@ class EmailService:
             if self.smtp_user and self.smtp_password:
                 server.login(self.smtp_user, self.smtp_password)
             yield server
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"SMTP authentication failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Email authentication failed"
+            )
+        except smtplib.SMTPException as e:
+            logger.error(f"SMTP error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Email service error"
+            )
         except Exception as e:
             logger.error(f"SMTP connection error: {e}")
-            raise
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Email connection failed"
+            )
         finally:
             if server:
                 try:

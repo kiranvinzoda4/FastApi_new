@@ -1,8 +1,10 @@
 import json
 import traceback
+import logging
 import bcrypt
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from jwcrypto import jwk, jwt
 from app.config import JWT_KEY
 from app.libs.utils import now, create_password, generate_otp
@@ -11,7 +13,9 @@ from .schemas import LoginRequest, LoginResponse, Profile, ChangePassword, Forgo
 # Import functions that were in the old auth.py - need to be implemented or moved
 # from app.routers.admin.crud.auth import generate_access_token, generate_refresh_token, refresh_access_token
 from app.libs.emails import send_email
-from app.libs.email_template import forgot_password_template
+from app.libs.template_manager import forgot_password_template
+
+logger = logging.getLogger(__name__)
 
 
 def verify_token(db: Session, token: str):
@@ -54,13 +58,19 @@ def verify_token(db: Session, token: str):
 
 
 def get_admin_user_by_id(db: Session, id: str):
-    return db.query(AdminUserModel).filter(AdminUserModel.id == id, AdminUserModel.is_deleted == False).first()
+    return db.query(AdminUserModel).filter(
+        AdminUserModel.id == id, 
+        AdminUserModel.is_deleted.is_(False)
+    ).first()
 
 
 def get_admin_user_by_email(db: Session, email: str):
     return (
         db.query(AdminUserModel)
-        .filter(AdminUserModel.email == email, AdminUserModel.is_deleted == False)
+        .filter(
+            AdminUserModel.email == email, 
+            AdminUserModel.is_deleted.is_(False)
+        )
         .first()
     )
 
@@ -68,7 +78,10 @@ def get_admin_user_by_email(db: Session, email: str):
 def get_admin_user_by_otp(db: Session, otp: str):
     return (
         db.query(AdminUserModel)
-        .filter(AdminUserModel.otp == otp, AdminUserModel.is_deleted == False)
+        .filter(
+            AdminUserModel.otp == otp, 
+            AdminUserModel.is_deleted.is_(False)
+        )
         .first()
     )
 
@@ -128,31 +141,53 @@ def change_password(db: Session, admin_user: ChangePassword, token: str):
 
 
 def send_forgot_password_email(db: Session, request: ForgotPasswordRequest):
-    db_admin_user = get_admin_user_by_email(db=db, email=request.email)
-    if not db_admin_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='User Not Found.')
+    try:
+        db_admin_user = get_admin_user_by_email(db=db, email=request.email)
+        if not db_admin_user:
+            logger.warning(f"Password reset attempt for non-existent email: {request.email}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='User Not Found.')
 
-    otp = generate_otp()
-    db_admin_user.otp = otp
-    db.commit()
+        otp = generate_otp()
+        db_admin_user.otp = otp
+        db.commit()
+        
+        logger.info(f"OTP generated for user: {db_admin_user.email}")
 
-    email_body = forgot_password_template(
-        first_name=db_admin_user.first_name,
-        last_name=db_admin_user.last_name,
-        otp=otp
-    )
-
-    if not send_email(
-        recipients=[db_admin_user.email],
-        subject="DailyVeg: OTP for Password Reset",
-        html_body=email_body 
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while sending email.",
+        email_body = forgot_password_template(
+            first_name=db_admin_user.first_name,
+            last_name=db_admin_user.last_name,
+            otp=otp
         )
 
-    return {"detail": "OTP has been sent successfully."}
+        if not send_email(
+            recipients=[db_admin_user.email],
+            subject="DailyVeg: OTP for Password Reset",
+            html_body=email_body 
+        ):
+            logger.error(f"Failed to send password reset email to: {db_admin_user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error while sending email.",
+            )
+        
+        logger.info(f"Password reset email sent successfully to: {db_admin_user.email}")
+        return {"detail": "OTP has been sent successfully."}
+        
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error in send_forgot_password_email: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in send_forgot_password_email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred"
+        )
 
 
 def otp_verify(db: Session, request: OTPVerifyRequest):

@@ -1,21 +1,20 @@
-# DailyVeg API Portal
+# Demo Project
 
 ## 🛠️ Installation
 
-1. **Create virtual environment**
+1. **Install Poetry** (if not already installed)
    ```bash
-   python -m venv venv
-   
-   # Windows
-   venv\Scripts\activate
-   
-   # Linux/Mac
-   source venv/bin/activate
+   pip install poetry
    ```
 
-2. **Install dependencies**
+2. **Install dependencies and create virtual environment**
    ```bash
-   pip install -r requirements.txt
+   poetry install
+   ```
+
+3. **Activate Poetry shell**
+   ```bash
+   poetry shell
    ```
 
 3. **Environment Configuration**
@@ -27,17 +26,17 @@
 4. **Database Setup**
    ```bash
    # Run migrations
-   alembic upgrade head
+   poetry run alembic upgrade head
    
    # Seed initial data (optional)
-   python app/seed_data.py
+   poetry run python app/seed_data.py
    ```
 
 5. **Start Development Server**
    ```bash
-   python dev.py
+   poetry run python dev.py
    # OR
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 ### Docker Deployment
@@ -49,11 +48,30 @@
 
 2. **Manual Docker Build**
    ```bash
-   docker build -t dailyveg-api:latest .
-   docker run -d -p 8000:8000 --env-file .env dailyveg-api:latest
+   docker build -t demo-project:latest .
+   docker run -d -p 8000:8000 --env-file .env demo-project:latest
    ```
 
 ## ⚙️ Configuration
+
+### Poetry Dependency Management
+
+```bash
+# Add new dependency
+poetry add package-name
+
+# Add development dependency
+poetry add --group dev package-name
+
+# Update dependencies
+poetry update
+
+# Show dependency tree
+poetry show --tree
+
+# Export requirements.txt (if needed)
+poetry export -f requirements.txt --output requirements.txt
+```
 
 ### JWT Key Generation
 
@@ -69,32 +87,32 @@ print(key.export())  # Use this value for JWT_KEY
 
 ```bash
 # Create new migration
-alembic revision --autogenerate -m "Description of changes"
+poetry run alembic revision --autogenerate -m "Description of changes"
 
 # Apply migrations
-alembic upgrade head
+poetry run alembic upgrade head
 
 # Rollback migration
-alembic downgrade -1
+poetry run alembic downgrade -1
 
 # View migration history
-alembic history
+poetry run alembic history
 ```
 
 ## 🧪 Testing
 
 ```bash
 # Run all tests
-pytest
+poetry run pytest
 
 # Run with coverage
-pytest --cov=app
+poetry run pytest --cov=app
 
 # Run specific test file
-pytest tests/test_health.py
+poetry run pytest tests/test_health.py
 
 # Run with verbose output
-pytest -v
+poetry run pytest -v
 ```
 
 ## 📊 API Documentation
@@ -127,15 +145,15 @@ Once the server is running:
 
 ```bash
 # Build production image
-docker build -t dailyveg-api:prod .
+docker build -t demo-project:prod .
 
 # Run with production settings
 docker run -d \
-  --name dailyveg-api \
+  --name demo-project \
   -p 8000:8000 \
   --env-file .env.prod \
   --restart unless-stopped \
-  dailyveg-api:prod
+  demo-project:prod
 ```
 
 ### Performance Tuning
@@ -152,13 +170,13 @@ docker run -d \
 
 ```bash
 # Format code
-black app/
+poetry run black app/
 
 # Lint code
-flake8 app/
+poetry run flake8 app/
 
 # Type checking
-mypy app/
+poetry run mypy app/
 ```
 
 ### Project Structure
@@ -203,7 +221,38 @@ For support and questions:
 - Check the API documentation at `/docs`
 - Review the health check endpoints for system status
 
+## 🔄 Migration from pip to Poetry
+
+If you're migrating from the previous pip-based setup:
+
+1. **Remove old virtual environment**
+   ```bash
+   # Deactivate if active
+   deactivate
+   
+   # Remove old venv folder
+   rmdir /s venv  # Windows
+   rm -rf venv    # Linux/Mac
+   ```
+
+2. **Install Poetry and dependencies**
+   ```bash
+   pip install poetry
+   poetry install
+   ```
+
+3. **Update your workflow**
+   - Replace `pip install -r requirements.txt` with `poetry install`
+   - Use `poetry run` prefix for all commands
+   - Use `poetry shell` to activate the environment
+
 ## 🔄 Changelog
+
+### v1.1.0
+- Migrated to Poetry for dependency management
+- Improved dependency resolution and lock file
+- Updated Docker configuration for Poetry
+- Enhanced development workflow
 
 ### v1.0.0
 - Initial professional release

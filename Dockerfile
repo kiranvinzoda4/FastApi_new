@@ -1,7 +1,16 @@
 FROM python:3.10.4
 
-COPY ./requirements.txt /requirements.txt
-RUN pip install --no-cache-dir -r /requirements.txt
+# Install Poetry
+RUN pip install poetry
+
+# Configure Poetry
+RUN poetry config virtualenvs.create false
+
+# Copy Poetry files
+COPY pyproject.toml poetry.lock* /
+
+# Install dependencies
+RUN poetry install --only=main --no-dev
 
 COPY ./alembic.ini /
 RUN mkdir /app

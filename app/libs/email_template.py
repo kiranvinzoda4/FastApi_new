@@ -1,4 +1,11 @@
+import html
+
 def forgot_password_template(first_name, last_name, otp):
+    # Escape user inputs to prevent XSS
+    first_name = html.escape(str(first_name))
+    last_name = html.escape(str(last_name))
+    otp = html.escape(str(otp))
+    
     return f"""
     <html>
     <head>
@@ -97,6 +104,11 @@ def forgot_password_template(first_name, last_name, otp):
 
 
 def send_password_template(first_name, last_name, password):
+    # Escape user inputs to prevent XSS
+    first_name = html.escape(str(first_name))
+    last_name = html.escape(str(last_name))
+    password = html.escape(str(password))
+    
     return f"""
     <html>
     <head>
