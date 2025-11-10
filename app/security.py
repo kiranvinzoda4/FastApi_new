@@ -9,41 +9,32 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import settings
 from app.exceptions import AuthenticationException, AuthorizationException
-
 logger = logging.getLogger(__name__)
-
 # Password hashing
 pwd_context: CryptContext = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # JWT settings
 ALGORITHM: str = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
 # Security scheme
 security: HTTPBearer = HTTPBearer()
-
 class SecurityUtils:
     @staticmethod
     def hash_password(password: str) -> str:
         """Hash a password"""
         return pwd_context.hash(password)
-    
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash"""
         return pwd_context.verify(plain_password, hashed_password)
-    
     @staticmethod
     def generate_otp(length: int = 6) -> str:
         """Generate a secure OTP"""
         return ''.join(secrets.choice('0123456789') for _ in range(length))
-    
     @staticmethod
     def generate_secure_token(length: int = 32) -> str:
         """Generate a secure random token"""
         return secrets.token_urlsafe(length)
-    
     @staticmethod
     def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         """Create JWT access token"""
@@ -52,9 +43,7 @@ class SecurityUtils:
             expire: datetime = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        
         to_encode.update({"exp": expire, "type": "access"})
-        
         try:
             key = SecurityUtils._get_jwt_key("access")
             encoded_jwt: str = jwt.encode(to_encode, key, algorithm=ALGORITHM)
@@ -62,14 +51,12 @@ class SecurityUtils:
         except Exception as e:
             logger.error(f"Error creating access token: {e}")
             raise AuthenticationException("Failed to create access token")
-    
     @staticmethod
     def create_refresh_token(data: Dict[str, Any]) -> str:
         """Create JWT refresh token"""
         to_encode: Dict[str, Any] = data.copy()
         expire: datetime = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         to_encode.update({"exp": expire, "type": "refresh"})
-        
         try:
             key = SecurityUtils._get_jwt_key("refresh")
             encoded_jwt: str = jwt.encode(to_encode, key, algorithm=ALGORITHM)
@@ -77,21 +64,16 @@ class SecurityUtils:
         except Exception as e:
             logger.error(f"Error creating refresh token: {e}")
             raise AuthenticationException("Failed to create refresh token")
-    
     @staticmethod
     def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
         """Verify and decode JWT token"""
         try:
             # Get JWT key based on token type with validation
             key = SecurityUtils._get_jwt_key(token_type)
-            # amazonq-ignore-next-line
-            
             payload: Dict[str, Any] = jwt.decode(token, key, algorithms=[ALGORITHM])
-            
             # Verify token type
             if payload.get("type") != token_type:
                 raise AuthenticationException("Invalid token type")
-            
             return payload
         except JWTError as e:
             logger.warning(f"JWT verification failed: {e}")
@@ -99,7 +81,6 @@ class SecurityUtils:
         except Exception as e:
             logger.error(f"Token verification error: {e}")
             raise AuthenticationException("Token verification failed")
-    
     @staticmethod
     def _get_jwt_key(token_type: str) -> Any:
         """Get JWT key with proper validation"""
@@ -113,12 +94,10 @@ class SecurityUtils:
             return getattr(settings, 'REFRESH_JWT_KEY')
         else:
             raise AuthenticationException(f"Invalid token type: {token_type}")
-    
     @staticmethod
     def hash_api_key(api_key: str) -> str:
         """Hash API key for storage"""
         return hashlib.sha256(api_key.encode()).hexdigest()
-
 # Dependency for getting current user from token
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """Get current user from JWT token"""
@@ -133,21 +112,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception as e:
         logger.error(f"Error getting current user: {e}")
         raise AuthenticationException("Authentication failed")
-
 # Optional authentication dependency
 async def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
     """Get current user if token is provided, otherwise return None"""
     authorization: Optional[str] = request.headers.get("Authorization")
     if not authorization or not authorization.startswith("Bearer "):
         return None
-    
     try:
         token: str = authorization.split(" ")[1]
         payload: Dict[str, Any] = SecurityUtils.verify_token(token, "access")
         return payload
     except Exception:
         return None
-
 # Rate limiting key function
 def get_user_id_or_ip(request: Request) -> str:
     """Get user ID from token or fall back to IP address for rate limiting"""
@@ -159,7 +135,6 @@ def get_user_id_or_ip(request: Request) -> str:
             return f"user:{payload.get('sub', 'unknown')}"
     except Exception:
         pass
-    
     # Fall back to IP address
     forwarded_for: Optional[str] = request.headers.get("X-Forwarded-For")
     if forwarded_for:

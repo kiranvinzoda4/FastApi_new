@@ -5,10 +5,7 @@ from app.dependencies import get_db
 from app.security import get_current_user
 from app.core.error_handler import handle_errors
 from . import crud, schemas
-
 router = APIRouter(prefix="/countries", tags=["Countries"])
-
-
 def admin_auth(db: Session = Depends(get_db), current_user: Dict[str, Any] = Depends(get_current_user)) -> Session:
     """Token validation dependency."""
     if not current_user:
@@ -17,7 +14,6 @@ def admin_auth(db: Session = Depends(get_db), current_user: Dict[str, Any] = Dep
             detail="Authentication required"
         )
     return db
-
 @router.get(
     "/",
     response_model=schemas.CountryList,
@@ -42,7 +38,6 @@ async def get_countries(
         sort_by=sort_by,
         order=order
     )
-
 @router.get(
     "/{country_id}",
     response_model=schemas.Country,
@@ -55,14 +50,7 @@ async def get_country(
     db: Session = Depends(admin_auth)
 ) -> schemas.Country:
     """Get a specific country by ID"""
-    result = crud.get_country_by_id(db, country_id)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Country not found"
-        )
-    return result
-
+    return crud.get_country_by_id(db, country_id)
 @router.post(
     "/",
     response_model=schemas.Country,
@@ -77,7 +65,6 @@ async def create_country(
 ) -> schemas.Country:
     """Create a new country"""
     return crud.create_country(db=db, country=country)
-
 @router.put(
     "/{country_id}",
     response_model=schemas.Country,
@@ -87,13 +74,11 @@ async def create_country(
 @handle_errors
 async def update_country(
     country_id: str = Query(..., min_length=1, max_length=36, description="Country ID"),
-    # amazonq-ignore-next-line
     country: schemas.CountryUpdate = ...,
     db: Session = Depends(admin_auth)
 ) -> schemas.Country:
     """Update an existing country"""
     return crud.update_country(db=db, country_id=country_id, country=country)
-
 @router.delete(
     "/{country_id}",
     summary="Delete country",

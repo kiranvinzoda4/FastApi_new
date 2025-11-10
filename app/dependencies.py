@@ -5,9 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from app.database import SessionLocal
 from app.exceptions import DatabaseException
-
 logger = logging.getLogger(__name__)
-
 def get_db() -> Generator[Session, None, None]:
     """Database dependency with proper error handling"""
     db = None

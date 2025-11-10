@@ -3,12 +3,9 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.dependencies import get_db
 from app.security import get_current_user
-from app.middleware.error_handler import handle_errors
+from app.core.error_handler import handle_errors
 from . import crud, schemas
-
 router = APIRouter()
-
-
 def admin_auth(db: Session = Depends(get_db), current_user: Dict[str, Any] = Depends(get_current_user)) -> Session:
     """Token validation dependency."""
     if not current_user:
@@ -17,8 +14,6 @@ def admin_auth(db: Session = Depends(get_db), current_user: Dict[str, Any] = Dep
             detail="Authentication required"
         )
     return db
-
-
 @router.get("/cities", response_model=schemas.CityList, tags=["Cities"])
 @handle_errors
 async def get_cities(
@@ -34,24 +29,13 @@ async def get_cities(
     return crud.get_cities(
         db, start, limit, sort_by, order, search, state_id, country_id
     )
-
-
 @router.get("/cities/{city_id}", response_model=schemas.CityWithState, tags=["Cities"])
 @handle_errors
 async def get_city(
-    # amazonq-ignore-next-line
     city_id: str = Query(..., min_length=1, max_length=36, description="City ID"),
     db: Session = Depends(admin_auth)
 ) -> schemas.CityWithState:
-    result = crud.get_city_by_id(db, city_id)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="City not found"
-        )
-    return result
-
-
+    return crud.get_city_by_id(db, city_id)
 @router.post("/cities", response_model=schemas.CityWithState, tags=["Cities"])
 @handle_errors
 async def create_city(
@@ -59,19 +43,14 @@ async def create_city(
     db: Session = Depends(admin_auth)
 ) -> schemas.CityWithState:
     return crud.create_city(db, city_data)
-
-
 @router.put("/cities/{city_id}", response_model=schemas.CityWithState, tags=["Cities"])
 @handle_errors
 async def update_city(
     city_id: str = Query(..., min_length=1, max_length=36, description="City ID"),
-    # amazonq-ignore-next-line
     city_data: schemas.CityUpdate = ...,
     db: Session = Depends(admin_auth)
 ) -> schemas.CityWithState:
     return crud.update_city(db, city_id, city_data)
-
-
 @router.delete("/cities/{city_id}", tags=["Cities"])
 @handle_errors
 async def delete_city(

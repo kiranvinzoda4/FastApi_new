@@ -1,6 +1,5 @@
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import random
 import uuid
 from faker import Faker
@@ -13,17 +12,12 @@ from app.models import (
     UnitTypeEnum, OrderStatusEnum,
     UserAddressesModel
 )
-
 fake = Faker()
-
 # generate_order_code function removed - use the one from utils.py
-
 def generate_indian_phone():
     return f"{random.choice(['6', '7', '8', '9'])}{fake.random_number(digits=9, fix_len=True)}"
-
 def seed_data(db: Session):
     print("🔄 Seeding data...")
-
     # 1. Admins
     for _ in range(3):
         try:
@@ -39,7 +33,6 @@ def seed_data(db: Session):
             ))
         except Exception as e:
             print(f"❌ Failed to create admin: {e}")
-
     # 2. Customers + Addresses
     customers = []
     for _ in range(10):
@@ -54,7 +47,6 @@ def seed_data(db: Session):
             otp=None
         )
         db.add(customer)
-
         address = UserAddressesModel(
             id=str(uuid.uuid4()),
             customer_id=customer_id,
@@ -67,7 +59,6 @@ def seed_data(db: Session):
         )
         db.add(address)
         customers.append((customer, address))
-
     # 3. Delivery Guys
     delivery_guys = []
     for _ in range(5):
@@ -85,7 +76,6 @@ def seed_data(db: Session):
         )
         db.add(guy)
         delivery_guys.append(guy)
-
     # 4. Vegetables
     vegetables = []
     for _ in range(10):
@@ -100,9 +90,7 @@ def seed_data(db: Session):
         )
         db.add(veg)
         vegetables.append(veg)
-
     db.commit()
-
     # 5. Orders & Items
     for _ in range(20):
         customer, address = random.choice(customers)
@@ -120,7 +108,6 @@ def seed_data(db: Session):
         )
         db.add(order)
         db.commit()
-
         total = 0
         for _ in range(random.randint(1, 3)):
             veg = random.choice(vegetables)
@@ -134,10 +121,8 @@ def seed_data(db: Session):
                 price=price
             ))
             total += qty * price
-
         order.total_amount = round(total, 2)
         db.commit()
-
     # 6. Ratings
     for _ in range(15):
         db.add(DeliveryGuyRatingModel(
@@ -147,7 +132,6 @@ def seed_data(db: Session):
             rating=random.randint(1, 5),
             comment=fake.sentence()
         ))
-
     for _ in range(15):
         db.add(VegetableRatingModel(
             id=str(uuid.uuid4()),
@@ -156,10 +140,8 @@ def seed_data(db: Session):
             rating=random.randint(1, 5),
             comment=fake.sentence()
         ))
-
     db.commit()
     print("✅ Seeder completed.")
-
 if __name__ == "__main__":
     db = SessionLocal()
     try:

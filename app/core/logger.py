@@ -3,12 +3,10 @@ import logging.config
 import sys
 from pathlib import Path
 from app.config import settings
-
 def setup_logging():
     """Single centralized logging configuration"""
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
-    
     logging.config.dictConfig({
         "version": 1,
         "disable_existing_loggers": False,
@@ -46,5 +44,4 @@ def setup_logging():
             },
         },
     })
-    
     logging.getLogger("app").info("Centralized logging initialized")

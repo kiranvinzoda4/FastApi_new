@@ -5,12 +5,9 @@ from typing import List
 from dotenv import load_dotenv
 from pydantic import validator
 from pydantic_settings import BaseSettings
-
 # Load environment variables
 load_dotenv()
-
 logger = logging.getLogger(__name__)
-
 class Settings(BaseSettings):
     # Database
     DB_HOST: str = "localhost"
@@ -20,27 +17,22 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_POOL_SIZE: int = 100
     WEB_CONCURRENCY: int = 2
-    
     # JWT Keys - Required for security
     JWT_KEY: str
     ACCESS_JWT_KEY: str  
     REFRESH_JWT_KEY: str
-    
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    
     # Admin User (for seeding) - SECURITY: No password in config, use secure reset flow
     ADMIN_EMAIL: str = ""
     # ADMIN_PASSWORD removed - use password reset links instead of hardcoded passwords
-    
     # Application
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: str = "*"
-    
     @validator('JWT_KEY', 'ACCESS_JWT_KEY', 'REFRESH_JWT_KEY')
     def validate_jwt_keys(cls, v):
         if not v or v.strip() == "":
@@ -53,17 +45,14 @@ class Settings(BaseSettings):
         except (json.JSONDecodeError, TypeError) as e:
             logger.error(f"Invalid JWT key format: {e}")
             raise ValueError("JWT key must be valid JSON in JWK format")
-    
     @validator('CORS_ORIGINS')
     def validate_cors_origins(cls, v):
         if v == "*":
             return ["*"]
         return [origin.strip() for origin in v.split(",")]
-    
     class Config:
         env_file = ".env"
         case_sensitive = True
-
 try:
     settings = Settings()
 except ValueError as e:
@@ -75,7 +64,6 @@ except FileNotFoundError as e:
 except Exception as e:
     logger.error(f"Unexpected configuration error: {e}")
     raise RuntimeError(f"Failed to load configuration: {e}")
-
 # Export for backward compatibility
 DB_USER = settings.DB_USER
 DB_PASSWORD = settings.DB_PASSWORD
