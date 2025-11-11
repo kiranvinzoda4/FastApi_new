@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from jwcrypto import jwk, jwt
-from app.config import JWT_KEY
+from app.config import settings
 from app.libs.utils import now, create_password, generate_otp
 from app.models import AdminUserModel
 from .schemas import (
@@ -109,7 +109,7 @@ def verify_token(db: Session, token: str):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
         )
     try:
-        key = jwk.JWK(**JWT_KEY)
+        key = jwk.JWK(**json.loads(settings.ACCESS_JWT_KEY))
         ET = jwt.JWT(key=key, jwt=token, expected_type="JWE")
         ST = jwt.JWT(key=key, jwt=ET.claims)
         claims = json.loads(ST.claims)

@@ -1,118 +1,89 @@
 import pytest
-import tempfile
-import os
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from app.main import app
+from app.database import Base, get_db
 
+# Import fixtures
+from tests.fixtures.test_data import *
 
-# Mock database configuration for tests
-@pytest.fixture(scope="session", autouse=True)
-def mock_database_config():
-    """Mock database configuration to avoid MySQL connection during tests"""
-    with patch("app.config.settings") as mock_settings:
-        mock_settings.DB_HOST = "localhost"
-        mock_settings.DB_PORT = 3306
-        mock_settings.DB_USER = "test"
-        mock_settings.DB_PASSWORD = "test"
-        mock_settings.DB_NAME = "test_db"
-        mock_settings.DB_POOL_SIZE = 5
-        mock_settings.WEB_CONCURRENCY = 1
-        mock_settings.DEBUG = False
-        mock_settings.ACCESS_JWT_KEY = {"k": "test_key", "kty": "oct"}
-        mock_settings.REFRESH_JWT_KEY = {"k": "test_refresh_key", "kty": "oct"}
-        yield mock_settings
+SQLITE_DATABASE_URL = "sqlite:///:memory:"
 
+engine = create_engine(SQLITE_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
 
 @pytest.fixture(scope="session")
-def test_db():
-    """Create test database"""
-    db_fd, db_path = tempfile.mkstemp()
-    test_database_url = f"sqlite:///{db_path}"
-    engine = create_engine(test_database_url, connect_args={"check_same_thread": False})
-    # Import Base after mocking config
-    from app.database import Base
-
+def db_engine():
     Base.metadata.create_all(bind=engine)
     yield engine
-    os.close(db_fd)
-    os.unlink(db_path)
-
+    Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
-def db_session(test_db):
-    """Create database session for tests"""
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
-
+def db_session(db_engine):
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
+    yield session
+    session.close()
+    transaction.rollback()
+    connection.close()
 
 @pytest.fixture
-def client(db_session, mock_database_config):
-    """Create test client with database override"""
-    # Import after mocking
-    from app.main import app
-    from app.database import get_db
-
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
-
+def client():
+    return TestClient(app)
 
 @pytest.fixture
-def admin_user(db_session):
-    """Create test admin user"""
-    from tests.fixtures.test_data import TestDataFactory
+def mock_settings():
+    with patch('app.config.settings') as mock:
+        mock.ACCESS_JWT_KEY = '{"k":"dGVzdGtleWZvcmp3dHRlc3RpbmdwdXJwb3Nlc29ubHk","kty":"oct"}'
+        mock.REFRESH_JWT_KEY = '{"k":"dGVzdGtleWZvcmp3dHRlc3RpbmdwdXJwb3Nlc29ubHk","kty":"oct"}'
+        mock.SMTP_USER = "test@example.com"
+        mock.SMTP_PASSWORD = "testpass"
+        yield mock
 
-    user = TestDataFactory.create_admin_user()
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
+def pytest_configure(config):
+    """Configure pytest with custom settings"""
+    config.addinivalue_line("markers", "unit: Unit tests")
+    config.addinivalue_line("markers", "integration: Integration tests") 
+    config.addinivalue_line("markers", "e2e: End-to-end tests")
 
+def pytest_collection_modifyitems(config, items):
+    """Add markers to tests based on their location"""
+    for item in items:
+        if "unit" in str(item.fspath):
+            item.add_marker(pytest.mark.unit)
+        elif "integration" in str(item.fspath):
+            item.add_marker(pytest.mark.integration)
+        elif "e2e" in str(item.fspath):
+            item.add_marker(pytest.mark.e2e)
 
-@pytest.fixture
-def customer_user(db_session):
-    """Create test customer"""
-    from tests.fixtures.test_data import TestDataFactory
+def pytest_sessionstart(session):
+    """Print clean startup message"""
+    print("\nFastAPI Test Suite")
+    print("=" * 20)
 
-    customer = TestDataFactory.create_customer()
-    db_session.add(customer)
-    db_session.commit()
-    db_session.refresh(customer)
-    return customer
+def pytest_sessionfinish(session, exitstatus):
+    """Print clean completion message"""
+    if exitstatus == 0:
+        print("\nAll tests passed!")
+    else:
+        print(f"\n{exitstatus} test(s) failed")
 
+def pytest_runtest_logstart(nodeid, location):
+    """Custom test start logging"""
+    pass  # Keep quiet during individual test runs
 
-@pytest.fixture
-def vegetable(db_session):
-    """Create test vegetable"""
-    from tests.fixtures.test_data import TestDataFactory
-
-    veg = TestDataFactory.create_vegetable()
-    db_session.add(veg)
-    db_session.commit()
-    db_session.refresh(veg)
-    return veg
-
-
-@pytest.fixture
-def auth_headers(admin_user, mock_database_config):
-    """Create authentication headers for admin user"""
-    from app.security import SecurityUtils
-
-    token = SecurityUtils.create_access_token(
-        {"sub": admin_user.id, "email": admin_user.email}
-    )
-    return {"Authorization": f"Bearer {token}"}
+def pytest_runtest_logfinish(nodeid, location):
+    """Custom test finish logging"""
+    pass  # Keep quiet during individual test runs

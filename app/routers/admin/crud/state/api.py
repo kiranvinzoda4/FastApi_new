@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Depends, HTTPException, status
+from fastapi import APIRouter, Query, Path, Depends, HTTPException, status
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -7,18 +7,13 @@ from . import crud, schemas
 
 router = APIRouter()
 
-
-def admin_auth(
-    db: Session = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(get_current_user),
-) -> Session:
-    """Token validation dependency."""
+def admin_auth(db: Session = Depends(get_db), current_user: Dict[str, Any] = Depends(get_current_user)) -> Session:
     if not current_user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
         )
     return db
-
 
 @router.get("/states", response_model=schemas.StateList, tags=["States"])
 async def get_states(
@@ -32,38 +27,35 @@ async def get_states(
 ) -> schemas.StateList:
     return crud.get_states(db, start, limit, sort_by, order, search, country_id)
 
-
 @router.get(
     "/states/{state_id}", response_model=schemas.StateWithCountry, tags=["States"]
 )
 async def get_state(
-    state_id: str = Query(..., min_length=36, max_length=36, description="State ID"),
-    db: Session = Depends(admin_auth),
+    state_id: str = Path(..., min_length=36, max_length=36, description="State ID"),
+    db: Session = Depends(admin_auth)
 ) -> schemas.StateWithCountry:
     return crud.get_state_by_id(db, state_id)
 
-
 @router.post("/states", response_model=schemas.StateWithCountry, tags=["States"])
 async def create_state(
-    state_data: schemas.StateCreate, db: Session = Depends(admin_auth)
+    state_data: schemas.StateCreate,
+    db: Session = Depends(admin_auth)
 ) -> schemas.StateWithCountry:
     return crud.create_state(db, state_data)
-
 
 @router.put(
     "/states/{state_id}", response_model=schemas.StateWithCountry, tags=["States"]
 )
 async def update_state(
-    state_id: str = Query(..., min_length=36, max_length=36, description="State ID"),
+    state_id: str = Path(..., min_length=36, max_length=36, description="State ID"),
     state_data: schemas.StateUpdate = ...,
-    db: Session = Depends(admin_auth),
+    db: Session = Depends(admin_auth)
 ) -> schemas.StateWithCountry:
     return crud.update_state(db, state_id, state_data)
 
-
 @router.delete("/states/{state_id}", tags=["States"])
 async def delete_state(
-    state_id: str = Query(..., min_length=36, max_length=36, description="State ID"),
-    db: Session = Depends(admin_auth),
+    state_id: str = Path(..., min_length=36, max_length=36, description="State ID"),
+    db: Session = Depends(admin_auth)
 ) -> Dict[str, str]:
     return crud.delete_state(db, state_id)

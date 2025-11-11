@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.security import get_current_user
@@ -12,7 +12,6 @@ def admin_auth(
     db: Session = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Session:
-    """Token validation dependency."""
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
@@ -36,7 +35,6 @@ async def get_countries(
     order: Optional[str] = Query("asc", regex="^(asc|desc)$", description="Sort order"),
     db: Session = Depends(admin_auth),
 ) -> schemas.CountryList:
-    """Get paginated list of countries with search and sorting capabilities"""
     return crud.get_countries(
         db=db, start=start, limit=limit, search=search, sort_by=sort_by, order=order
     )
@@ -49,12 +47,11 @@ async def get_countries(
     description="Retrieve a specific country by its ID",
 )
 async def get_country(
-    country_id: str = Query(
+    country_id: str = Path(
         ..., min_length=36, max_length=36, description="Country ID"
     ),
     db: Session = Depends(admin_auth),
 ) -> schemas.Country:
-    """Get a specific country by ID"""
     return crud.get_country_by_id(db, country_id)
 
 
@@ -68,7 +65,6 @@ async def get_country(
 async def create_country(
     country: schemas.CountryCreate, db: Session = Depends(admin_auth)
 ) -> schemas.Country:
-    """Create a new country"""
     return crud.create_country(db=db, country=country)
 
 
@@ -79,13 +75,12 @@ async def create_country(
     description="Update an existing country",
 )
 async def update_country(
-    country_id: str = Query(
+    country_id: str = Path(
         ..., min_length=36, max_length=36, description="Country ID"
     ),
     country: schemas.CountryUpdate = ...,
     db: Session = Depends(admin_auth),
 ) -> schemas.Country:
-    """Update an existing country"""
     return crud.update_country(db=db, country_id=country_id, country=country)
 
 
@@ -95,10 +90,9 @@ async def update_country(
     description="Soft delete a country (mark as deleted)",
 )
 async def delete_country(
-    country_id: str = Query(
+    country_id: str = Path(
         ..., min_length=36, max_length=36, description="Country ID"
     ),
     db: Session = Depends(admin_auth),
 ) -> Dict[str, str]:
-    """Delete a country (soft delete)"""
     return crud.delete_country(db=db, country_id=country_id)

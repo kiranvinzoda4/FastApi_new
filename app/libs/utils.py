@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 import phonenumbers
 from sqlalchemy import inspect
 from jwcrypto import jwk, jwt
-from app.config import JWT_KEY
+from app.config import settings
 import json
 import bcrypt
 import logging
@@ -103,7 +103,7 @@ def get_token(admin_user_id: str, email: str, user_type: str) -> str:
         "time": str(now()),
     }
     # Create a signed token with the generated key
-    key = jwk.JWK(**JWT_KEY)
+    key = jwk.JWK(**json.loads(settings.ACCESS_JWT_KEY))
     token = jwt.JWT(header={"alg": "HS256"}, claims=claims)
     token.make_signed_token(key)
     # Further encrypt the token with the same key
@@ -120,7 +120,7 @@ def validate_token(token: str) -> Dict[str, Any]:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format"
             )
-        key = jwk.JWK(**JWT_KEY)
+        key = jwk.JWK(**json.loads(settings.ACCESS_JWT_KEY))
         # Decrypt the outer JWE
         outer = jwt.JWT(key=key, jwt=token, expected_type="JWE")
         # Decode the inner signed JWT
