@@ -22,30 +22,30 @@ def setup_logging():
             "handlers": {
                 "console": {
                     "class": "logging.StreamHandler",
-                    "level": "INFO",
+                    "level": "ERROR",
                     "formatter": "standard",
                     "stream": sys.stdout,
                 },
                 "file": {
                     "class": "logging.handlers.RotatingFileHandler",
-                    "level": "DEBUG",
+                    "level": "ERROR",
                     "formatter": "standard",
-                    "filename": "logs/app.log",
+                    "filename": "logs/error.log",
                     "maxBytes": 10485760,
                     "backupCount": 5,
                 },
             },
             "loggers": {
                 "": {
-                    "level": settings.LOG_LEVEL,
+                    "level": "ERROR",
                     "handlers": ["console", "file"],
                 },
                 "uvicorn": {
-                    "level": "INFO",
+                    "level": "ERROR",
                     "handlers": ["console"],
                     "propagate": False,
                 },
             },
         }
     )
-    logging.getLogger("app").info("Centralized logging initialized")
+

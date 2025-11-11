@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 
+
 from app.routers.admin import api as admin
 from app.config import settings
 from app.core.logger import setup_logging
@@ -20,10 +21,8 @@ logger = logging.getLogger("app.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info(f"Starting {PROJECT_NAME}")
     yield
     # Shutdown
-    logger.info(f"Shutting down {PROJECT_NAME}")
     db_manager.close()
 
 
@@ -50,6 +49,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Total-Count"],
 )
+
 
 # Include routers
 app.include_router(admin.router)
