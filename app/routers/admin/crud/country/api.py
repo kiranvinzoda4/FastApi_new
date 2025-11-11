@@ -23,7 +23,7 @@ def admin_auth(
     "/",
     response_model=schemas.CountryList,
     summary="Get all countries",
-    description="Retrieve a paginated list of countries with optional search and sorting",
+    description="GET /countries - Retrieve a paginated list of countries with optional search and sorting",
 )
 async def get_countries(
     start: int = Query(0, ge=0, description="Starting index for pagination"),
@@ -44,7 +44,7 @@ async def get_countries(
     "/{country_id}",
     response_model=schemas.Country,
     summary="Get country by ID",
-    description="Retrieve a specific country by its ID",
+    description="GET /countries/{id} - Retrieve a specific country by its ID",
 )
 async def get_country(
     country_id: str = Path(
@@ -60,7 +60,7 @@ async def get_country(
     response_model=schemas.Country,
     status_code=status.HTTP_201_CREATED,
     summary="Create new country",
-    description="Create a new country with unique code",
+    description="POST /countries - Create a new country with unique code",
 )
 async def create_country(
     country: schemas.CountryCreate, db: Session = Depends(admin_auth)
@@ -72,7 +72,7 @@ async def create_country(
     "/{country_id}",
     response_model=schemas.Country,
     summary="Update country",
-    description="Update an existing country",
+    description="PUT /countries/{id} - Update an existing country",
 )
 async def update_country(
     country_id: str = Path(
@@ -87,7 +87,7 @@ async def update_country(
 @router.delete(
     "/{country_id}",
     summary="Delete country",
-    description="Soft delete a country (mark as deleted)",
+    description="DELETE /countries/{id} - Soft delete a country (mark as deleted)",
 )
 async def delete_country(
     country_id: str = Path(

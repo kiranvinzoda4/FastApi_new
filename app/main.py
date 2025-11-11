@@ -5,9 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
-from prometheus_fastapi_instrumentator import Instrumentator
+
 from app.routers.admin import api as admin
-from app.routers import health
 from app.config import settings
 from app.core.logger import setup_logging
 from app.core.error_handler import global_exception_handler
@@ -51,10 +50,8 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Total-Count"],
 )
-# Prometheus metrics
-Instrumentator().instrument(app).expose(app)
+
 # Include routers
-app.include_router(health.router)
 app.include_router(admin.router)
 # Global exception handler
 app.add_exception_handler(Exception, global_exception_handler)
@@ -73,11 +70,4 @@ if os.path.exists(os.path.join("app", "static", "info")):
     )
 
 
-# Root endpoint
-@app.get("/")
-async def root():
-    return {
-        "message": PROJECT_NAME,
-        "version": PROJECT_VERSION,
-        "docs": "/docs" if settings.DEBUG else "Documentation disabled in production",
-    }
+
