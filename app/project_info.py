@@ -2,6 +2,7 @@
 Centralized project information
 Change these values to customize for different projects
 """
+
 PROJECT_NAME = "DailyVeg API Portal"
 PROJECT_DESCRIPTION = "Professional APIs for DailyVeg Platform"
 PROJECT_VERSION = "1.0.0"

@@ -1,5 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
+
+
 class TestHealthAPI:
     def test_basic_health_check(self, client: TestClient):
         """Test basic health check endpoint"""
@@ -8,6 +10,7 @@ class TestHealthAPI:
         data = response.json()
         assert data["status"] == "healthy"
         assert "timestamp" in data
+
     def test_detailed_health_check(self, client: TestClient):
         """Test detailed health check endpoint"""
         response = client.get("/health/detailed")
@@ -19,6 +22,7 @@ class TestHealthAPI:
         assert "uptime" in data
         # Check database status
         assert data["database"]["status"] in ["healthy", "unhealthy"]
+
     def test_health_check_response_format(self, client: TestClient):
         """Test health check response format"""
         response = client.get("/health")

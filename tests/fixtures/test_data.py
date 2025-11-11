@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from app.models import AdminUserModel, CustomerModel, VegetableModel
 from app.libs.utils import create_password
+
+
 class TestDataFactory:
     @staticmethod
     def create_admin_user(**kwargs):
@@ -14,10 +16,11 @@ class TestDataFactory:
             "password": create_password("TestPass123!"),
             "user_type": "admin",
             "created_at": datetime.now(),
-            "updated_at": datetime.now()
+            "updated_at": datetime.now(),
         }
         defaults.update(kwargs)
         return AdminUserModel(**defaults)
+
     @staticmethod
     def create_customer(**kwargs):
         defaults = {
@@ -28,10 +31,11 @@ class TestDataFactory:
             "phone": "9876543211",
             "password": create_password("TestPass123!"),
             "created_at": datetime.now(),
-            "updated_at": datetime.now()
+            "updated_at": datetime.now(),
         }
         defaults.update(kwargs)
         return CustomerModel(**defaults)
+
     @staticmethod
     def create_vegetable(**kwargs):
         defaults = {
@@ -42,7 +46,7 @@ class TestDataFactory:
             "quantity": 100,
             "unit_type": "kg",
             "created_at": datetime.now(),
-            "updated_at": datetime.now()
+            "updated_at": datetime.now(),
         }
         defaults.update(kwargs)
         return VegetableModel(**defaults)

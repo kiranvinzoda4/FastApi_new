@@ -28,7 +28,6 @@ def get_cities(
         filters["state_id"] = state_id
     if country_id:
         filters["state.country_id"] = country_id
-    
     return get_records(
         db=db,
         model_class=CityModel,
@@ -41,12 +40,14 @@ def get_cities(
         filters=filters,
     )
 
+
 def get_city_by_id(db: Session, city_id: str) -> CityModel:
     return get_record(
         db=db,
         model_class=CityModel,
         filters={"id": city_id.strip(), "is_deleted": False},
     )
+
 
 def create_city(db: Session, city: CityCreate) -> CityModel:
     # Validate state exists
@@ -60,7 +61,6 @@ def create_city(db: Session, city: CityCreate) -> CityModel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="State not found"
         )
-    
     # Check for duplicate city name in same state
     existing_city = get_record(
         db=db,
@@ -73,8 +73,8 @@ def create_city(db: Session, city: CityCreate) -> CityModel:
             status_code=status.HTTP_409_CONFLICT,
             detail="City with this name already exists in the state",
         )
-    
     return create_record(db, CityModel, city)
+
 
 def update_city(db: Session, city_id: str, city: CityUpdate) -> CityModel:
     # Validate state exists
@@ -88,7 +88,6 @@ def update_city(db: Session, city_id: str, city: CityUpdate) -> CityModel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="State not found"
         )
-    
     # Check for duplicate city name in same state (excluding current city)
     existing_city = get_record(
         db=db,
@@ -101,8 +100,8 @@ def update_city(db: Session, city_id: str, city: CityUpdate) -> CityModel:
             status_code=status.HTTP_409_CONFLICT,
             detail="City with this name already exists in the state",
         )
-    
     return update_record(db, CityModel, city_id.strip(), city)
+
 
 def delete_city(db: Session, city_id: str) -> Dict[str, str]:
     result = delete_record(db, CityModel, city_id.strip())
@@ -110,5 +109,4 @@ def delete_city(db: Session, city_id: str) -> Dict[str, str]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="City not found"
         )
-    
     return {"detail": "City deleted successfully"}

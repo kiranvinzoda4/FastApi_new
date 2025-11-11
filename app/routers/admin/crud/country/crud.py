@@ -12,7 +12,6 @@ from app.routers.admin.crud.crud import (
 )
 
 
-
 def get_countries(
     db: Session,
     start: int,
@@ -23,7 +22,6 @@ def get_countries(
 ) -> Dict[str, Any]:
     search_fields = ["name", "code"] if search else None
     filters: Dict[str, Any] = {"is_deleted": False}
-    
     return get_records(
         db=db,
         model_class=CountryModel,

@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.security import get_current_user
-
 from . import crud, schemas
 
 router = APIRouter(prefix="/countries", tags=["Countries"])
@@ -50,7 +49,9 @@ async def get_countries(
     description="Retrieve a specific country by its ID",
 )
 async def get_country(
-    country_id: str = Query(..., min_length=36, max_length=36, description="Country ID"),
+    country_id: str = Query(
+        ..., min_length=36, max_length=36, description="Country ID"
+    ),
     db: Session = Depends(admin_auth),
 ) -> schemas.Country:
     """Get a specific country by ID"""
@@ -78,7 +79,9 @@ async def create_country(
     description="Update an existing country",
 )
 async def update_country(
-    country_id: str = Query(..., min_length=36, max_length=36, description="Country ID"),
+    country_id: str = Query(
+        ..., min_length=36, max_length=36, description="Country ID"
+    ),
     country: schemas.CountryUpdate = ...,
     db: Session = Depends(admin_auth),
 ) -> schemas.Country:
@@ -92,7 +95,9 @@ async def update_country(
     description="Soft delete a country (mark as deleted)",
 )
 async def delete_country(
-    country_id: str = Query(..., min_length=36, max_length=36, description="Country ID"),
+    country_id: str = Query(
+        ..., min_length=36, max_length=36, description="Country ID"
+    ),
     db: Session = Depends(admin_auth),
 ) -> Dict[str, str]:
     """Delete a country (soft delete)"""
