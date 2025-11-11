@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
-from app.database import db_manager
+from app.database import get_db
 from app.routers.admin.crud.auth_mod import crud
 from app.routers.admin.crud.auth_mod.schemas import (
     LoginRequest,
@@ -15,14 +15,6 @@ from app.routers.admin.crud.auth_mod.schemas import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-
-def get_db():
-    db = db_manager.get_session()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @router.post("/login", response_model=LoginResponse)

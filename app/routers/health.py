@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.dependencies import get_db
+from app.database import get_db
 from app.config import settings
 
 from pydantic import BaseModel

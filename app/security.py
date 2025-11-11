@@ -1,142 +1,72 @@
-import logging
 import secrets
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
-from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
 from app.config import settings
-from app.exceptions import AuthenticationException
-logger = logging.getLogger(__name__)
+
 # Password hashing
-pwd_context: CryptContext = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 # JWT settings
-ALGORITHM: str = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+
 # Security scheme
-security: HTTPBearer = HTTPBearer()
-class SecurityUtils:
-    @staticmethod
-    def hash_password(password: str) -> str:
-        """Hash a password"""
-        return pwd_context.hash(password)
-    @staticmethod
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash"""
-        return pwd_context.verify(plain_password, hashed_password)
-    @staticmethod
-    def generate_otp(length: int = 6) -> str:
-        """Generate a secure OTP"""
-        return ''.join(secrets.choice('0123456789') for _ in range(length))
-    @staticmethod
-    def generate_secure_token(length: int = 32) -> str:
-        """Generate a secure random token"""
-        return secrets.token_urlsafe(length)
-    @staticmethod
-    def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-        """Create JWT access token"""
-        to_encode: Dict[str, Any] = data.copy()
-        if expires_delta:
-            expire: datetime = datetime.utcnow() + expires_delta
-        else:
-            expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        to_encode.update({"exp": expire, "type": "access"})
-        try:
-            key = SecurityUtils._get_jwt_key("access")
-            encoded_jwt: str = jwt.encode(to_encode, key, algorithm=ALGORITHM)
-            return encoded_jwt
-        except Exception as e:
-            logger.error(f"Error creating access token: {e}")
-            raise AuthenticationException("Failed to create access token")
-    @staticmethod
-    def create_refresh_token(data: Dict[str, Any]) -> str:
-        """Create JWT refresh token"""
-        to_encode: Dict[str, Any] = data.copy()
-        expire: datetime = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-        to_encode.update({"exp": expire, "type": "refresh"})
-        try:
-            key = SecurityUtils._get_jwt_key("refresh")
-            encoded_jwt: str = jwt.encode(to_encode, key, algorithm=ALGORITHM)
-            return encoded_jwt
-        except Exception as e:
-            logger.error(f"Error creating refresh token: {e}")
-            raise AuthenticationException("Failed to create refresh token")
-    @staticmethod
-    def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
-        """Verify and decode JWT token"""
-        try:
-            # Get JWT key based on token type with validation
-            key = SecurityUtils._get_jwt_key(token_type)
-            payload: Dict[str, Any] = jwt.decode(token, key, algorithms=[ALGORITHM])
-            # Verify token type
-            if payload.get("type") != token_type:
-                raise AuthenticationException("Invalid token type")
-            return payload
-        except JWTError as e:
-            logger.warning(f"JWT verification failed: {e}")
-            raise AuthenticationException("Invalid token")
-        except Exception as e:
-            logger.error(f"Token verification error: {e}")
-            raise AuthenticationException("Token verification failed")
-    @staticmethod
-    def _get_jwt_key(token_type: str) -> Any:
-        """Get JWT key with proper validation"""
-        if token_type == "access":
-            if not hasattr(settings, 'ACCESS_JWT_KEY') or not settings.ACCESS_JWT_KEY:
-                raise AuthenticationException("Access JWT key not configured")
-            return getattr(settings, 'ACCESS_JWT_KEY')
-        elif token_type == "refresh":
-            if not hasattr(settings, 'REFRESH_JWT_KEY') or not settings.REFRESH_JWT_KEY:
-                raise AuthenticationException("Refresh JWT key not configured")
-            return getattr(settings, 'REFRESH_JWT_KEY')
-        else:
-            raise AuthenticationException(f"Invalid token type: {token_type}")
-    @staticmethod
-    def hash_api_key(api_key: str) -> str:
-        """Hash API key for storage"""
-        return hashlib.sha256(api_key.encode()).hexdigest()
-# Dependency for getting current user from token
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+security = HTTPBearer()
+
+
+def hash_password(password: str) -> str:
+    """Hash a password"""
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def generate_otp(length: int = 6) -> str:
+    """Generate a secure OTP"""
+    return "".join(secrets.choice("0123456789") for _ in range(length))
+
+
+def create_access_token(data: Dict[str, Any]) -> str:
+    """Create JWT access token"""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, settings.ACCESS_JWT_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(data: Dict[str, Any]) -> str:
+    """Create JWT refresh token"""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, settings.REFRESH_JWT_KEY, algorithm=ALGORITHM)
+
+
+def verify_access_token(token: str) -> Dict[str, Any]:
+    """Verify and decode access token"""
+    return jwt.decode(token, settings.ACCESS_JWT_KEY, algorithms=[ALGORITHM])
+
+
+def verify_refresh_token(token: str) -> Dict[str, Any]:
+    """Verify and decode refresh token"""
+    return jwt.decode(token, settings.REFRESH_JWT_KEY, algorithms=[ALGORITHM])
+
+
+async def get_current_user(credentials=Depends(security)) -> Dict[str, Any]:
     """Get current user from JWT token"""
     try:
-        payload: Dict[str, Any] = SecurityUtils.verify_token(credentials.credentials, "access")
-        user_id: Optional[str] = payload.get("sub")
-        if user_id is None:
-            raise AuthenticationException("Invalid token payload")
-        return payload
-    except AuthenticationException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting current user: {e}")
-        raise AuthenticationException("Authentication failed")
-# Optional authentication dependency
-async def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
-    """Get current user if token is provided, otherwise return None"""
-    authorization: Optional[str] = request.headers.get("Authorization")
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    try:
-        token: str = authorization.split(" ")[1]
-        payload: Dict[str, Any] = SecurityUtils.verify_token(token, "access")
+        payload = verify_access_token(credentials.credentials)
+        if not payload.get("sub"):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
         return payload
     except Exception:
-        return None
-# Rate limiting key function
-def get_user_id_or_ip(request: Request) -> str:
-    """Get user ID from token or fall back to IP address for rate limiting"""
-    try:
-        authorization: Optional[str] = request.headers.get("Authorization")
-        if authorization and authorization.startswith("Bearer "):
-            token: str = authorization.split(" ")[1]
-            payload: Dict[str, Any] = SecurityUtils.verify_token(token, "access")
-            return f"user:{payload.get('sub', 'unknown')}"
-    except Exception:
-        pass
-    # Fall back to IP address
-    forwarded_for: Optional[str] = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return f"ip:{forwarded_for.split(',')[0].strip()}"
-    return f"ip:{request.client.host if request.client else 'unknown'}"
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")

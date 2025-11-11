@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Depends, HTTPException, status
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from app.dependencies import get_db
+from app.database import get_db
 from app.security import get_current_user
 
 from . import crud, schemas
