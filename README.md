@@ -50,6 +50,12 @@ poetry run pytest tests/e2e/ -q --color=yes         # End-to-end tests
 
 # Run with coverage (clean output)
 poetry run pytest tests/ -q --cov=app --cov-report=term-missing --disable-warnings
+
+# Run tests with automatic cache cleanup
+poetry run python test_and_clean.py
+
+# Manual cache cleanup
+poetry run python cleanup.py
 ```
 
 **Current Tests (38 passing):**
