@@ -1,15 +1,6 @@
-from typing import Optional
 from fastapi import (
     APIRouter,
-    Depends,
-    Header,
-    HTTPException,
-    Query,
-    status,
 )
-from sqlalchemy.orm import Session
-from app.libs.utils import get_user_type
-from app.dependencies import get_db
 from app.routers.admin.crud.auth_mod.api import router as auth_router
 from app.routers.admin.crud.country.api import router as country_router
 from app.routers.admin.crud.state.api import router as state_router

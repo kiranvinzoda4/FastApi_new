@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
 from app.config import settings
-from app.core.error_handler import handle_errors
+
 from pydantic import BaseModel
 router = APIRouter(prefix="/health", tags=["Health Check"])
 class HealthResponse(BaseModel):
@@ -28,7 +28,6 @@ async def health_check():
         environment="production" if not settings.DEBUG else "development"
     )
 @router.get("/detailed", response_model=DetailedHealthResponse)
-@handle_errors
 async def detailed_health_check(db: Session = Depends(get_db)):
     """Detailed health check with service status"""
     # Check database connection

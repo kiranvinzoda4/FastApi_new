@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Type, Union, Tuple
+from typing import Any, Dict, List, Optional, Type, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import Session, aliased, class_mapper, Query
@@ -8,11 +8,12 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.sqltypes import String as SQLAlchemyString
 from sqlalchemy.inspection import inspect
 from app.libs.utils import generate_id, now
+
 logger = logging.getLogger(__name__)
+
+
 def get_record_by_id(
-    db: Session,
-    model_class: Type[DeclarativeMeta],
-    id: str
+    db: Session, model_class: Type[DeclarativeMeta], id: str
 ) -> Optional[Any]:
     return (
         db.query(model_class)
@@ -22,10 +23,10 @@ def get_record_by_id(
         )
         .first()
     )
+
+
 def get_record_by_value(
-    db: Session,
-    model_class: Type[DeclarativeMeta],
-    value: str
+    db: Session, model_class: Type[DeclarativeMeta], value: str
 ) -> Optional[Any]:
     try:
         return (
@@ -40,17 +41,25 @@ def get_record_by_value(
         logger.error(f"Database error in get_record_by_value: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
+            detail="Database error occurred",
         )
+
+
 def validate_filter_keys(model_class: DeclarativeMeta, filters: Dict[str, Any]) -> None:
     valid_columns = set(c.name for c in model_class.__table__.columns)
     for key in filters:
         if key not in valid_columns:
-            raise ValueError(f"Invalid column '{key}' for model '{model_class.__name__}'")
-def apply_filters(query: Query, model_class: Type[DeclarativeMeta], filters: Dict[str, Any]) -> Query:
+            raise ValueError(
+                f"Invalid column '{key}' for model '{model_class.__name__}'"
+            )
+
+
+def apply_filters(
+    query: Query, model_class: Type[DeclarativeMeta], filters: Dict[str, Any]
+) -> Query:
     aliases: Dict[str, Any] = {}
     for full_field, value in filters.items():
-        path_parts = full_field.split('.')
+        path_parts = full_field.split(".")
         current_model = model_class
         current_path = []
         current_alias = None
@@ -63,10 +72,14 @@ def apply_filters(query: Query, model_class: Type[DeclarativeMeta], filters: Dic
             else:
                 attr = getattr(current_model, part, None)
                 if not isinstance(attr, InstrumentedAttribute):
-                    raise HTTPException(status_code=400, detail=f"Invalid relationship: {part}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid relationship: {part}"
+                    )
                 relationship = class_mapper(current_model).relationships.get(part)
                 if not relationship:
-                    raise HTTPException(status_code=400, detail=f"Invalid relationship: {part}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid relationship: {part}"
+                    )
                 related_model = relationship.mapper.class_
                 current_alias = aliased(related_model)
                 if len(current_path) == 1:
@@ -87,12 +100,14 @@ def apply_filters(query: Query, model_class: Type[DeclarativeMeta], filters: Dic
         else:
             query = query.filter(column == value)
     return query
+
+
 def apply_search_sort(
-    query: Query, 
-    model_class: Type[DeclarativeMeta], 
-    path: str, 
-    aliases: Dict[str, Any], 
-    is_search: bool = True
+    query: Query,
+    model_class: Type[DeclarativeMeta],
+    path: str,
+    aliases: Dict[str, Any],
+    is_search: bool = True,
 ) -> Tuple[Query, Any]:
     current_model = model_class
     current_path: List[str] = []
@@ -106,10 +121,14 @@ def apply_search_sort(
         else:
             attr = getattr(current_model, part, None)
             if not isinstance(attr, InstrumentedAttribute):
-                raise HTTPException(status_code=400, detail=f"Invalid relationship: {part}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid relationship: {part}"
+                )
             relationship = class_mapper(current_model).relationships.get(part)
             if not relationship:
-                raise HTTPException(status_code=400, detail=f"Invalid relationship: {part}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid relationship: {part}"
+                )
             related_model = relationship.mapper.class_
             current_alias = aliased(related_model)
             if len(current_path) == 1:
@@ -126,12 +145,16 @@ def apply_search_sort(
     column_name = path.split(".")[-1]
     column = getattr(target_model, column_name, None)
     if column is None:
-        raise HTTPException(status_code=400, detail=f"Invalid field: {path.split('.')[-1]}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid field: {path.split('.')[-1]}"
+        )
     if len(path.split(".")) <= 1:
         column = getattr(current_model, path, None)
         if column is None:
             raise HTTPException(status_code=400, detail=f"Invalid field: {path}")
     return query, column
+
+
 def get_sort_field(sort_by: str, sort_listing: List[str]) -> str:
     if sort_by in sort_listing:
         return sort_by
@@ -139,6 +162,8 @@ def get_sort_field(sort_by: str, sort_listing: List[str]) -> str:
         if sort_by in field.split(".")[:-1]:
             return field
     raise HTTPException(status_code=400, detail=f"Invalid sort field: {sort_by}")
+
+
 def get_records(
     db: Session,
     model_class: Type[DeclarativeMeta],
@@ -174,13 +199,17 @@ def get_records(
         query = query.filter(or_(*search_conditions))
     if sort_by:
         sort_aliases: Dict[str, Any] = {}
-        query, sort_field = apply_search_sort(query, model_class, sort_by, sort_aliases, is_search=False)
+        query, sort_field = apply_search_sort(
+            query, model_class, sort_by, sort_aliases, is_search=False
+        )
         query = query.order_by(sort_field.desc() if order == "desc" else sort_field)
     else:
         query = query.order_by(model_class.created_at.desc())
     results = query.offset(start).limit(limit).all()
     count = query.count()
     return {"count": count, "list": results}
+
+
 def get_record(
     db: Session,
     model_class: Type[DeclarativeMeta],
@@ -206,12 +235,20 @@ def get_record(
             detail=f"{model_name} not found",
         )
     return db_record
-def create_record(db: Session, model_class: Type[DeclarativeMeta], request_schema: Any) -> Any:
+
+
+def create_record(
+    db: Session, model_class: Type[DeclarativeMeta], request_schema: Any
+) -> Any:
     record = model_class(id=generate_id(), **request_schema.model_dump())
     db.add(record)
     db.commit()
     return record
-def update_record(db: Session, model_class: Type[DeclarativeMeta], record_id: str, request_schema: Any) -> Any:
+
+
+def update_record(
+    db: Session, model_class: Type[DeclarativeMeta], record_id: str, request_schema: Any
+) -> Any:
     db_record = (
         db.query(model_class)
         .filter(model_class.id == record_id, model_class.is_deleted.is_(False))
@@ -228,7 +265,11 @@ def update_record(db: Session, model_class: Type[DeclarativeMeta], record_id: st
     db_record.updated_at = now()
     db.commit()
     return db_record
-def delete_record(db: Session, model_class: Type[DeclarativeMeta], record_id: str) -> Any:
+
+
+def delete_record(
+    db: Session, model_class: Type[DeclarativeMeta], record_id: str
+) -> Any:
     db_record = (
         db.query(model_class)
         .filter(model_class.id == record_id, model_class.is_deleted.is_(False))
@@ -244,12 +285,14 @@ def delete_record(db: Session, model_class: Type[DeclarativeMeta], record_id: st
     db_record.updated_at = now()
     db.commit()
     return db_record
+
+
 def has_any_child_relation(
     db: Session,
     parent_model: Type[DeclarativeMeta],
     parent_id: str,
     soft_delete_field: str = "is_deleted",
-    exclude_relationships: Optional[List[str]] = None
+    exclude_relationships: Optional[List[str]] = None,
 ) -> bool:
     parent = db.get(parent_model, parent_id)
     if not parent:
@@ -267,12 +310,14 @@ def has_any_child_relation(
             if not getattr(obj, soft_delete_field, False):
                 return True
     return False
+
+
 def find_child_data(
     db: Session,
     target_model: Type[DeclarativeMeta],
     target_id: str,
     include_tables: Optional[List[str]] = None,
-    exclude_tables: Optional[List[str]] = None
+    exclude_tables: Optional[List[str]] = None,
 ) -> bool:
     target_column = target_model.__table__.c.id
     metadata = target_model.__table__.metadata
@@ -287,9 +332,11 @@ def find_child_data(
                 if fk.column == target_column:
                     exists = db.query(table).filter(column == target_id).first()
                     if exists:
-                        referenced_in.append({
-                            "from_table": table.name,
-                            "column": column.name,
-                            "references": str(fk.column)
-                        })
+                        referenced_in.append(
+                            {
+                                "from_table": table.name,
+                                "column": column.name,
+                                "references": str(fk.column),
+                            }
+                        )
     return bool(referenced_in)

@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status, Depends, Request
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import settings
-from app.exceptions import AuthenticationException, AuthorizationException
+from app.exceptions import AuthenticationException
 logger = logging.getLogger(__name__)
 # Password hashing
 pwd_context: CryptContext = CryptContext(schemes=["bcrypt"], deprecated="auto")

@@ -4,7 +4,6 @@ from sqlalchemy import create_engine, text, event, Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
-from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.config import settings
 logger = logging.getLogger(__name__)
 class DatabaseManager:

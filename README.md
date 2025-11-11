@@ -21,6 +21,7 @@
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
+   # For production: Set DEBUG=False and update all values
    ```
 
 4. **Database Setup**
@@ -75,11 +76,23 @@ poetry export -f requirements.txt --output requirements.txt
 
 ### JWT Key Generation
 
+Generate JWT keys and add to your `.env` file:
+
 ```python
-from jwcrypto import jwk
-key = jwk.JWK(generate='oct', size=256)
-print(key.export())  # Use this value for JWT_KEY
+import json
+import secrets
+import base64
+
+# Generate key
+key_bytes = secrets.token_bytes(32)
+key_b64 = base64.urlsafe_b64encode(key_bytes).decode('utf-8').rstrip('=')
+jwt_key = {"k": key_b64, "kty": "oct"}
+
+print(f'ACCESS_JWT_KEY={json.dumps(jwt_key)}')
+print(f'REFRESH_JWT_KEY={json.dumps(jwt_key)}')
 ```
+
+Run this twice to generate different keys for ACCESS_JWT_KEY and REFRESH_JWT_KEY.
 
 ## 🔧 Database Management
 

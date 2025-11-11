@@ -5,7 +5,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.routers.admin import api as admin
+from app.routers import health
 from app.config import settings
 from app.core.logger import setup_logging
 from app.core.error_handler import global_exception_handler
@@ -45,10 +47,8 @@ app.add_middleware(
     expose_headers=["X-Total-Count"]
 )
 # Prometheus metrics
-from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 # Include routers
-from app.routers import health
 app.include_router(health.router)
 app.include_router(admin.router)
 # Global exception handler
